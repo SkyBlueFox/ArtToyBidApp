@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.fb"
+    namespace = "com.example.bid"
     compileSdk = flutter.compileSdkVersion.toInt()
 
     ndkVersion = "27.0.12077973" // Set the NDK version explicitly
