@@ -9,11 +9,16 @@ class ProfileScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text(
           'Profile',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.pushNamed(context, '/settings');
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -22,26 +27,17 @@ class ProfileScreen extends StatelessWidget {
             const CircleAvatar(
               radius: 40,
               backgroundColor: Colors.grey,
-              child: Icon(
-                Icons.person,
-                size: 40,
-                color: Colors.white,
-              ),
+              child: Icon(Icons.person, size: 40, color: Colors.white),
             ),
             const SizedBox(height: 16),
             const Text(
               'Lois Beckett',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
             const Text(
               'Joined 2 weeks ago',
-              style: TextStyle(
-                color: Colors.grey,
-              ),
+              style: TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
@@ -54,26 +50,18 @@ class ProfileScreen extends StatelessWidget {
               onPressed: () {},
               child: const Text(
                 'Follow',
-                style: TextStyle(
-                  color: Colors.white,
-                ),
+                style: TextStyle(color: Colors.white),
               ),
             ),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.star,
-                  color: Colors.amber,
-                  size: 20,
-                ),
+                const Icon(Icons.star, color: Colors.amber, size: 20),
                 const SizedBox(width: 4),
                 const Text(
                   '4.5',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(width: 4),
                 const Text('(5 reviews)'),
@@ -82,10 +70,7 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 24),
             const Text(
               'Bidding history',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 16),
             ListTile(
@@ -110,7 +95,10 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  BottomNavigationBar _buildBottomNavBar(BuildContext context, int currentIndex) {
+  BottomNavigationBar _buildBottomNavBar(
+    BuildContext context,
+    int currentIndex,
+  ) {
     return BottomNavigationBar(
       currentIndex: currentIndex,
       type: BottomNavigationBarType.fixed,
@@ -122,7 +110,10 @@ class ProfileScreen extends StatelessWidget {
         switch (index) {
           case 0:
             Navigator.pushNamedAndRemoveUntil(
-              context, '/home', (route) => false);
+              context,
+              '/home',
+              (route) => false,
+            );
             break;
           case 1:
             Navigator.pushNamed(context, '/categories');

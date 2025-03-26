@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/theme_provider.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
           'Settings',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
       ),
       body: ListView(
@@ -20,33 +21,50 @@ class SettingsScreen extends StatelessWidget {
         children: [
           const Text(
             'Display Mode',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
-          SwitchListTile(
-            title: const Text('Dark Mode'),
-            value: false,
-            onChanged: (value) {},
+          const Text(
+            'Choose a display mode',
+            style: TextStyle(color: Colors.grey, fontSize: 14),
           ),
-          SwitchListTile(
-            title: const Text('Light Mode'),
-            value: true,
-            onChanged: (value) {},
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildThemeButton(
+                  context: context,
+                  icon: Icons.nightlight_round,
+                  label: 'Dark Mode',
+                  isSelected: themeProvider.isDarkMode,
+                  onTap: () {
+                    themeProvider.setThemeMode(ThemeMode.dark);
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildThemeButton(
+                  context: context,
+                  icon: Icons.wb_sunny,
+                  label: 'Light Mode',
+                  isSelected: !themeProvider.isDarkMode,
+                  onTap: () {
+                    themeProvider.setThemeMode(ThemeMode.light);
+                  },
+                ),
+              ),
+            ],
           ),
           const Divider(height: 32),
           ListTile(
-            title: const Text(
-              'Log Out',
-              style: TextStyle(
-                color: Colors.red,
-              ),
-            ),
+            title: const Text('Log Out', style: TextStyle(color: Colors.red)),
             onTap: () {
               Navigator.pushNamedAndRemoveUntil(
-                context, '/signin', (route) => false);
+                context,
+                '/signin',
+                (route) => false,
+              );
             },
           ),
         ],
@@ -55,7 +73,68 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  BottomNavigationBar _buildBottomNavBar(BuildContext context, int currentIndex) {
+  Widget _buildThemeButton({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    final isDarkTheme = theme.brightness == Brightness.dark;
+
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        backgroundColor:
+            isSelected
+                ? isDarkTheme
+                    ? Colors
+                        .grey[800] // Darker background for dark mode selection
+                    : Colors
+                        .blue[50] // Lighter background for light mode selection
+                : theme.cardColor,
+        foregroundColor:
+            isSelected ? theme.primaryColor : theme.textTheme.bodyLarge?.color,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(
+            color: isSelected ? theme.primaryColor : theme.dividerColor,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        elevation: 0,
+      ),
+      onPressed: onTap,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            size: 20,
+            color:
+                isSelected
+                    ? theme.primaryColor
+                    : isDarkTheme
+                    ? Colors.grey[300]
+                    : Colors.grey[700],
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  BottomNavigationBar _buildBottomNavBar(
+    BuildContext context,
+    int currentIndex,
+  ) {
     return BottomNavigationBar(
       currentIndex: currentIndex,
       type: BottomNavigationBarType.fixed,
@@ -67,7 +146,10 @@ class SettingsScreen extends StatelessWidget {
         switch (index) {
           case 0:
             Navigator.pushNamedAndRemoveUntil(
-              context, '/home', (route) => false);
+              context,
+              '/home',
+              (route) => false,
+            );
             break;
           case 1:
             Navigator.pushNamed(context, '/categories');

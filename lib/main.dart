@@ -11,20 +11,30 @@ import 'screens/watchlist_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/community_screen.dart';
+import 'package:provider/provider.dart';
+import 'providers/theme_provider.dart';
 
-void main() => runApp(const ArtToyApp());
+void main() => runApp(
+  MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => ThemeProvider()),
+      // Add more providers here
+    ],
+    child: const ArtToyApp(),
+  ),
+);
 
 class ArtToyApp extends StatelessWidget {
   const ArtToyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
     return MaterialApp(
       title: 'Art Toy Bid',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        fontFamily: 'Inter',
-      ),
+      theme: ThemeData(primarySwatch: Colors.blue, fontFamily: 'Inter'),
+      darkTheme: ThemeData.dark(),
+      themeMode: themeProvider.themeMode,
       initialRoute: '/signin',
       routes: {
         '/signin': (context) => const SignInScreen(),
