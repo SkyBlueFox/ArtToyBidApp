@@ -40,18 +40,41 @@ class ProfileScreen extends StatelessWidget {
               style: TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+            Column(
+              children: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: () {},
+                  child: const Text(
+                    'Follow',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
-              ),
-              onPressed: () {},
-              child: const Text(
-                'Follow',
-                style: TextStyle(color: Colors.white),
-              ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/community');
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.people, size: 20, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text('Community', style: TextStyle(color: Colors.white)),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             Row(
