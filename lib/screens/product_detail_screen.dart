@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'cart_service.dart';
 
-class ProductDetailScreen extends StatefulWidget {
+class ProductDetailPage extends StatefulWidget {
   final Map<String, dynamic> product;
   final VoidCallback onWatchlistChanged;
 
-  const ProductDetailScreen({
+  const ProductDetailPage({
     Key? key,
     required this.product,
     required this.onWatchlistChanged,
@@ -13,10 +13,10 @@ class ProductDetailScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<ProductDetailScreen> createState() => _ProductDetailScreenState();
+  State<ProductDetailPage> createState() => _ProductDetailScreenState();
 }
 
-class _ProductDetailScreenState extends State<ProductDetailScreen> {
+class _ProductDetailScreenState extends State<ProductDetailPage> {
   void _addToCartAndShowNotification(BuildContext context, bool isBuyNow) {
     // Add the product to cart with quantity 1
     CartService.addToCart({

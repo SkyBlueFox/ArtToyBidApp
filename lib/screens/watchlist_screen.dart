@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'product_detail_screen.dart';
 import 'watchlist_service.dart';
 
-class WatchlistScreen extends StatefulWidget {
-  const WatchlistScreen({super.key});
+class WatchlistPage extends StatefulWidget {
+  const WatchlistPage({super.key});
 
   @override
-  State<WatchlistScreen> createState() => _WatchlistScreenState();
+  State<WatchlistPage> createState() => _WatchlistScreenState();
 }
 
-class _WatchlistScreenState extends State<WatchlistScreen> {
+class _WatchlistScreenState extends State<WatchlistPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -46,7 +46,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ProductDetailScreen(
+              builder: (context) => ProductDetailPage(
                 product: item,
                 onWatchlistChanged: () {
                 setState(() {});

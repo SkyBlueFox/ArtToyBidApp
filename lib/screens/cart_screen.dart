@@ -161,7 +161,7 @@ class _CartScreenState extends State<CartScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => CheckoutScreen(
+                          builder: (context) => CheckoutPage(
                             selectedItems: List.from(_cartItems),
                           ),
                         ),

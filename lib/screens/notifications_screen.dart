@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'cart_service.dart';
 import 'order_status_screen.dart';
 
-class NotificationsScreen extends StatelessWidget {
-  const NotificationsScreen({super.key});
+class NotificationsPage extends StatelessWidget {
+  const NotificationsPage({super.key});
 
   @override
   Widget build(BuildContext context) {

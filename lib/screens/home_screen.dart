@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'product_detail_screen.dart';
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +81,7 @@ class HomeScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ProductDetailScreen(
+                  builder: (context) => ProductDetailPage(
                     product: promo['product'], productName: '', onWatchlistChanged: () {  },
                   ),
                 ),
@@ -236,7 +236,7 @@ class HomeScreen extends StatelessWidget {
         Navigator.push(
   context,
   MaterialPageRoute(
-    builder: (context) => ProductDetailScreen(
+    builder: (context) => ProductDetailPage(
       product: {
         'name': product['name'] ?? 'Unknown',  // แก้ตรงนี้
         'price': product['price'] ?? 'N/A',  // และตรงนี้

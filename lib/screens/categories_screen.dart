@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'product_detail_screen.dart';
 import 'watchlist_service.dart';
 
-class CategoriesScreen extends StatefulWidget {
-  const CategoriesScreen({super.key});
+class CategoriesPage extends StatefulWidget {
+  const CategoriesPage({super.key});
 
   @override
-  State<CategoriesScreen> createState() => _CategoriesScreenState();
+  State<CategoriesPage> createState() => _CategoriesPageState();
 }
 
-class _CategoriesScreenState extends State<CategoriesScreen> {
+class _CategoriesPageState extends State<CategoriesPage> {
   int _selectedFilterIndex = 0;
   final List<String> _filters = [
     'All',
@@ -176,7 +176,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ProductDetailScreen(
+            builder: (context) => ProductDetailPage(
               product: {
                 'name': product['name'],
                 'price': product['price'],

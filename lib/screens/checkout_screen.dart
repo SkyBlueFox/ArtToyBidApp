@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'cart_service.dart';
 
-class CheckoutScreen extends StatefulWidget {
+class CheckoutPage extends StatefulWidget {
   final List<Map<String, dynamic>> selectedItems;
 
-  const CheckoutScreen({
+  const CheckoutPage({
     Key? key,
     required this.selectedItems,
   }) : super(key: key);
 
   @override
-  State<CheckoutScreen> createState() => _CheckoutScreenState();
+  State<CheckoutPage> createState() => _CheckoutPageState();
 }
 
-class _CheckoutScreenState extends State<CheckoutScreen> {
+class _CheckoutPageState extends State<CheckoutPage> {
   int _selectedShippingIndex = 0;
   int _selectedPaymentIndex = 0;
   final TextEditingController _addressController = TextEditingController();

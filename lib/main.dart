@@ -1,4 +1,8 @@
+import 'package:bid/firebase_options.dart';
 import 'package:bid/screens/cart_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_ui_auth/firebase_ui_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:bid/providers/theme_provider.dart';
@@ -17,14 +21,12 @@ import 'package:bid/screens/profile_screen.dart';
 import 'package:bid/screens/community_screen.dart';
 import 'package:bid/services/cart_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(
     MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        // Remove ChangeNotifierProvider for CartService since it's not a ChangeNotifier
-        // CartService is used as a static class in your code
-      ],
+      providers: [ChangeNotifierProvider(create: (_) => ThemeProvider())],
       child: const ArtToyApp(),
     ),
   );
@@ -65,18 +67,19 @@ class ArtToyApp extends StatelessWidget {
         ),
       ),
       themeMode: themeProvider.themeMode,
-      initialRoute: '/signin',
+      initialRoute:
+          FirebaseAuth.instance.currentUser == null ? '/signin' : '/home', // Fixed to match route name
       routes: {
         '/signin': (context) => const SignInScreen(),
-        '/verify': (context) => const VerifyIdentityScreen(),
-        '/home': (context) => const HomeScreen(),
-        '/categories': (context) => const CategoriesScreen(),
-        '/notifications': (context) => const NotificationsScreen(),
-        '/watchlist': (context) => const WatchlistScreen(),
-        '/settings': (context) => const SettingsScreen(),
+        '/verify': (context) => const VerifyIdentityPage(),
+        '/home': (context) => const HomePage(),
+        '/categories': (context) => const CategoriesPage(),
+        '/notifications': (context) => const NotificationsPage(),
+        '/watchlist': (context) => const WatchlistPage(),
+        '/settings': (context) => const SettingsPage(),
         '/profile': (context) => const ProfileScreen(),
-        '/community': (context) => const CommunityScreen(),
-        '/tracking': (context) => const TrackingScreen(),
+        '/community': (context) => const CommunityPage(),
+        '/tracking': (context) => const TrackingPage(),
         '/cart': (context) => CartScreen(),
       },
       onGenerateRoute: (settings) {
@@ -84,7 +87,7 @@ class ArtToyApp extends StatelessWidget {
           case '/product':
             final args = settings.arguments as Map<String, dynamic>;
             return MaterialPageRoute(
-              builder: (context) => ProductDetailScreen(
+              builder: (context) => ProductDetailPage(
                 product: args['product'],
                 onWatchlistChanged: args['onWatchlistChanged'],
                 productName: args['productName'] ?? '',
@@ -93,12 +96,18 @@ class ArtToyApp extends StatelessWidget {
           case '/checkout':
             final args = settings.arguments as Map<String, dynamic>;
             return MaterialPageRoute(
-              builder: (context) => CheckoutScreen(
+              builder: (context) => CheckoutPage(
                 selectedItems: args['selectedItems'],
               ),
             );
           default:
-            return null;
+            return MaterialPageRoute(
+              builder: (context) => const Scaffold(
+                body: Center(
+                  child: Text('Page not found!'),
+                ),
+              ),
+            );
         }
       },
     );

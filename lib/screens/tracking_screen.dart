@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'cart_service.dart';
 import 'order_status_screen.dart';
 
-class TrackingScreen extends StatelessWidget {
-  const TrackingScreen({super.key});
+class TrackingPage extends StatelessWidget {
+  const TrackingPage({super.key});
 
   @override
   Widget build(BuildContext context) {
