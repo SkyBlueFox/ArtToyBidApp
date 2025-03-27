@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class VerifyIdentityScreen extends StatelessWidget {
-  const VerifyIdentityScreen({super.key});
+class VerifyIdentityPage extends StatelessWidget {
+  const VerifyIdentityPage({super.key});
 
   @override
   Widget build(BuildContext context) {

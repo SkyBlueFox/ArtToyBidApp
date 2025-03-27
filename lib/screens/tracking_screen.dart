@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class TrackingScreen extends StatelessWidget {
-  const TrackingScreen({super.key});
+class TrackingPage extends StatelessWidget {
+  const TrackingPage({super.key});
 
   @override
   Widget build(BuildContext context) {

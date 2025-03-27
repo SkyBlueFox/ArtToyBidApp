@@ -6,14 +6,14 @@ import 'package:camera/camera.dart';
 import 'dart:io';
 import 'dart:async';
 
-class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+class ProfilePage extends StatefulWidget {
+  const ProfilePage({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfilePageState extends State<ProfilePage> {
   File? _profileImage;
   final ImagePicker _picker = ImagePicker();
   bool _isUploading = false;
@@ -87,7 +87,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context,
       MaterialPageRoute(
         builder:
-            (context) => CameraScreen(
+            (context) => CameraPage(
               cameras: _cameras, // Pass entire list
               onImageCaptured: (File imageFile) {
                 setState(() => _profileImage = imageFile);
@@ -360,21 +360,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-class CameraScreen extends StatefulWidget {
+class CameraPage extends StatefulWidget {
   final List<CameraDescription> cameras;
   final Function(File) onImageCaptured;
 
-  const CameraScreen({
+  const CameraPage({
     super.key,
     required this.cameras,
     required this.onImageCaptured,
   });
 
   @override
-  State<CameraScreen> createState() => _CameraScreenState();
+  State<CameraPage> createState() => _CameraPageState();
 }
 
-class _CameraScreenState extends State<CameraScreen> {
+class _CameraPageState extends State<CameraPage> {
   CameraController? _controller;
   int _selectedCameraIndex = 0;
   bool _isInitializing = true;

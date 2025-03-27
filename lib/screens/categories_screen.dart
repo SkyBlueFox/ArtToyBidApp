@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-class CategoriesScreen extends StatefulWidget {
-  const CategoriesScreen({super.key});
+class CategoriesPage extends StatefulWidget {
+  const CategoriesPage({super.key});
 
   @override
-  State<CategoriesScreen> createState() => _CategoriesScreenState();
+  State<CategoriesPage> createState() => _CategoriesPageState();
 }
 
-class _CategoriesScreenState extends State<CategoriesScreen> {
+class _CategoriesPageState extends State<CategoriesPage> {
   int _selectedFilterIndex = 0;
   final List<String> _filters = [
     'All',

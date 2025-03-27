@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-class CheckoutScreen extends StatefulWidget {
-  const CheckoutScreen({super.key});
+class CheckoutPage extends StatefulWidget {
+  const CheckoutPage({super.key});
 
   @override
-  State<CheckoutScreen> createState() => _CheckoutScreenState();
+  State<CheckoutPage> createState() => _CheckoutPageState();
 }
 
-class _CheckoutScreenState extends State<CheckoutScreen> {
+class _CheckoutPageState extends State<CheckoutPage> {
   int _selectedShippingIndex = 0;
   int _selectedPaymentIndex = 0;
   final TextEditingController _addressController = TextEditingController();
