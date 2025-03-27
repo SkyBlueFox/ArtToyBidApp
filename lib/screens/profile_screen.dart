@@ -365,12 +365,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 }
 
 class CameraScreen extends StatefulWidget {
-  final CameraDescription camera;
+  final List<CameraDescription> cameras;
   final Function(File) onImageCaptured;
 
   const CameraScreen({
     super.key,
-    required this.camera,
+    required this.cameras,
     required this.onImageCaptured,
   });
 
@@ -379,81 +379,119 @@ class CameraScreen extends StatefulWidget {
 }
 
 class _CameraScreenState extends State<CameraScreen> {
-  late CameraController _controller;
-  late Future<void> _initializeControllerFuture;
-  bool _isRearCameraSelected = true;
+  CameraController? _controller;
+  int _selectedCameraIndex = 0;
+  bool _isInitializing = true;
 
   @override
   void initState() {
     super.initState();
-    _initializeCamera();
+    _initializeCamera(0); // Start with first camera
   }
 
-  Future<void> _initializeCamera() async {
-    _controller = CameraController(widget.camera, ResolutionPreset.medium);
+  Future<void> _initializeCamera(int index) async {
+    if (!mounted || index >= widget.cameras.length) return;
 
-    _initializeControllerFuture = _controller.initialize();
+    setState(() => _isInitializing = true);
 
-    if (!mounted) return;
-    setState(() {});
+    // Dispose previous controller if exists
+    await _controller?.dispose();
+
+    try {
+      final newController = CameraController(
+        widget.cameras[index],
+        ResolutionPreset.medium,
+      );
+
+      await newController.initialize();
+
+      if (!mounted) return;
+
+      setState(() {
+        _controller = newController;
+        _selectedCameraIndex = index;
+        _isInitializing = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isInitializing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Camera error: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  Future<void> _switchCamera() async {
+    if (widget.cameras.length < 2 || _isInitializing) return;
+    final newIndex = (_selectedCameraIndex + 1) % widget.cameras.length;
+    await _initializeCamera(newIndex);
+  }
+
+  Future<void> _takePicture() async {
+    if (_isInitializing ||
+        _controller == null ||
+        !_controller!.value.isInitialized)
+      return;
+
+    try {
+      final image = await _controller!.takePicture();
+      if (!mounted) return;
+      widget.onImageCaptured(File(image.path));
+      Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Failed to take picture')));
+      }
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
-  }
-
-  Future<void> _takePicture() async {
-    try {
-      await _initializeControllerFuture;
-
-      final XFile image = await _controller.takePicture();
-
-      if (!mounted) return;
-
-      widget.onImageCaptured(File(image.path));
-      Navigator.pop(context);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Failed to take picture')));
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Take a Picture')),
-      body: FutureBuilder<void>(
-        future: _initializeControllerFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
-            return Stack(
-              children: [
-                CameraPreview(_controller),
-                Positioned(
-                  bottom: 20,
-                  left: 0,
-                  right: 0,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      FloatingActionButton(
-                        onPressed: _takePicture,
-                        child: const Icon(Icons.camera),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          } else {
-            return const Center(child: CircularProgressIndicator());
-          }
-        },
+      appBar: AppBar(
+        title: const Text('Take Photo'),
+        actions: [
+          if (widget.cameras.length > 1)
+            IconButton(
+              icon: const Icon(Icons.cameraswitch),
+              onPressed: _isInitializing ? null : _switchCamera,
+            ),
+        ],
       ),
+      body:
+          _isInitializing
+              ? const Center(child: CircularProgressIndicator())
+              : _controller != null && _controller!.value.isInitialized
+              ? Stack(
+                children: [
+                  CameraPreview(_controller!),
+                  Positioned(
+                    bottom: 24,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: FloatingActionButton(
+                        backgroundColor: Colors.white,
+                        onPressed: _takePicture,
+                        child: const Icon(
+                          Icons.camera_alt,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+              : const Center(child: Text('Camera unavailable')),
     );
   }
 }
