@@ -83,18 +83,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    final camera = _cameras.first;
-
     Navigator.push(
       context,
       MaterialPageRoute(
         builder:
             (context) => CameraScreen(
-              camera: camera,
+              cameras: _cameras, // Pass entire list
               onImageCaptured: (File imageFile) {
-                setState(() {
-                  _profileImage = imageFile;
-                });
+                setState(() => _profileImage = imageFile);
               },
             ),
       ),
