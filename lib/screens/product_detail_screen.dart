@@ -1,25 +1,55 @@
 import 'package:flutter/material.dart';
+import 'cart_service.dart';
 
-class ProductDetailScreen extends StatelessWidget {
-  const ProductDetailScreen({super.key});
+class ProductDetailScreen extends StatefulWidget {
+  final Map<String, dynamic> product;
+  final VoidCallback onWatchlistChanged;
+
+  const ProductDetailScreen({
+    Key? key,
+    required this.product,
+    required this.onWatchlistChanged,
+    required String productName,
+  }) : super(key: key);
+
+  @override
+  State<ProductDetailScreen> createState() => _ProductDetailScreenState();
+}
+
+class _ProductDetailScreenState extends State<ProductDetailScreen> {
+  void _addToCartAndShowNotification(BuildContext context, bool isBuyNow) {
+    // Add the product to cart with quantity 1
+    CartService.addToCart({
+      ...widget.product,
+      'quantity': 1,
+      'isBuyNow': isBuyNow,
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${widget.product['name']} added to cart'),
+        duration: const Duration(seconds: 2),
+        action: SnackBarAction(
+          label: 'View Cart',
+          onPressed: () {
+            Navigator.pushNamed(
+              context, 
+              '/cart',
+              arguments: {
+                'cartItems': CartService.cartItems,
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Product Details',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.favorite_border),
-            onPressed: () {},
-          ),
-        ],
+        title: const Text('Product Details'),
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -28,13 +58,13 @@ class ProductDetailScreen extends StatelessWidget {
               height: 300,
               color: Colors.grey.shade200,
               child: Center(
-                child: Text(
-                  'Product Image',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 16,
-                  ),
-                ),
+                child: widget.product['image'] != null
+                    ? Image.asset(
+                        widget.product['image']!,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                      )
+                    : const Text('Product Image'),
               ),
             ),
             Padding(
@@ -42,91 +72,58 @@ class ProductDetailScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Kaws x Sesame Street',
-                    style: TextStyle(
+                  Text(
+                    widget.product['name'] ?? 'Unknown Product',
+                    style: const TextStyle(
                       fontSize: 24,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    '\$4,000',
-                    style: TextStyle(
+                  Text(
+                    widget.product['price'] ?? 'Price not available',
+                    style: const TextStyle(
                       fontSize: 20,
                       color: Colors.blue,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'This KAWS x Sesame Street is the perfect addition to any art collection.',
-                    style: TextStyle(fontSize: 16),
+                  Text(
+                    widget.product['description'] ?? 'No description available',
+                    style: const TextStyle(fontSize: 16),
                   ),
-                  const SizedBox(height: 24),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        TimerItem(value: '00', label: 'Days'),
-                        TimerItem(value: '00', label: 'Hours'),
-                        TimerItem(value: '54', label: 'Minutes'),
-                        TimerItem(value: '32', label: 'Seconds'),
-                      ],
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: const BorderSide(color: Colors.blue),
+                      ),
+                      onPressed: () {
+                        _addToCartAndShowNotification(context, false);
+                      },
+                      child: const Text('Place Bid'),
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: const BorderSide(color: Colors.blue),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          onPressed: () => _showBidBottomSheet(context),
-                          child: const Text(
-                            'Place Bid',
-                            style: TextStyle(
-                              color: Colors.blue,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: Colors.blue,
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            backgroundColor: Colors.blue,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          onPressed: () {
-                            Navigator.pushNamed(context, '/checkout');
-                          },
-                          child: const Text(
-                            'Buy Now',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                      onPressed: () {
+                        _addToCartAndShowNotification(context, true);
+                      },
+                      child: const Text('Buy Now'),
+                    ),
                   ),
                 ],
               ),
@@ -134,120 +131,6 @@ class ProductDetailScreen extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-
-  void _showBidBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (BuildContext context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Set an offer or buy now',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'You can set a minimum price for your item. Buyers can make offers at or above this price.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.black54,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const TextField(
-                  decoration: InputDecoration(
-                    labelText: 'Minimum Price',
-                    prefixText: 'USD ',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                const TextField(
-                  decoration: InputDecoration(
-                    labelText: 'Buy Now Price',
-                    prefixText: 'USD ',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/checkout');
-                    },
-                    child: const Text(
-                      'Continue',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class TimerItem extends StatelessWidget {
-  final String value;
-  final String label;
-
-  const TimerItem({
-    super.key,
-    required this.value,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.black54,
-          ),
-        ),
-      ],
     );
   }
 }

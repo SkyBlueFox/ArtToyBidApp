@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+import 'product_detail_screen.dart';
+import 'watchlist_service.dart';
 
-class WatchlistScreen extends StatelessWidget {
+class WatchlistScreen extends StatefulWidget {
   const WatchlistScreen({super.key});
 
+  @override
+  State<WatchlistScreen> createState() => _WatchlistScreenState();
+}
+
+class _WatchlistScreenState extends State<WatchlistScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -15,32 +22,44 @@ class WatchlistScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: GridView.count(
+      body: ListView.builder(
         padding: const EdgeInsets.all(16),
-        crossAxisCount: 2,
-        childAspectRatio: 0.8,
-        children: List.generate(4, (index) {
-          return _buildWatchlistItem(
-            'Supreme x Kaws Chum',
-            '\$4,000',
-          );
-        }),
+        itemCount: WatchlistService.watchlistItems.length,
+        itemBuilder: (context, index) {
+          final item = WatchlistService.watchlistItems[index];
+          return _buildWatchlistItem(item, context);
+        },
       ),
       bottomNavigationBar: _buildBottomNavBar(context, 2),
     );
   }
 
-  Widget _buildWatchlistItem(String title, String price) {
+  Widget _buildWatchlistItem(Map<String, String> item, BuildContext context) {
     return Card(
-      margin: const EdgeInsets.all(8),
+      margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Container(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ProductDetailScreen(
+                product: item,
+                onWatchlistChanged: () {
+                setState(() {});
+              }, productName: '',
+              ),
+            ),
+          );
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 200,
               decoration: const BoxDecoration(
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(12),
@@ -57,62 +76,57 @@ class WatchlistScreen extends StatelessWidget {
                 ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  price,
-                  style: const TextStyle(
-                    color: Colors.blue,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          side: const BorderSide(color: Colors.blue),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        onPressed: () {},
-                        child: const Text(
-                          'Bid',
-                          style: TextStyle(
-                            color: Colors.blue,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item['name']!,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
                     ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.favorite,
-                        color: Colors.red,
-                      ),
-                      onPressed: () {},
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    item['price']!,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.blue,
+                      fontWeight: FontWeight.w700,
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    item['description']!,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.favorite,
+                          color: Colors.red,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            WatchlistService.removeFromWatchlist(item['name']!);
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -129,7 +143,7 @@ class WatchlistScreen extends StatelessWidget {
         switch (index) {
           case 0:
             Navigator.pushNamedAndRemoveUntil(
-              context, '/home', (route) => false);
+                context, '/home', (route) => false);
             break;
           case 1:
             Navigator.pushNamed(context, '/categories');

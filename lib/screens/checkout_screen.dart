@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'cart_service.dart';
 
 class CheckoutScreen extends StatefulWidget {
-  const CheckoutScreen({super.key});
+  final List<Map<String, dynamic>> selectedItems;
+
+  const CheckoutScreen({
+    Key? key,
+    required this.selectedItems,
+  }) : super(key: key);
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -14,21 +20,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _showAddressError = false;
 
   final List<Map<String, dynamic>> _shippingOptions = [
-    {
-      'title': 'Standard Shipping',
-      'duration': '5-7 business days',
-      'price': 4.99,
-    },
-    {
-      'title': 'Express Shipping',
-      'duration': '2-3 business days',
-      'price': 9.99,
-    },
-    {
-      'title': 'Next Day Delivery',
-      'duration': '1 business day',
-      'price': 14.99,
-    },
+    {'title': 'Standard', 'duration': '5-7 days', 'price': 4.99},
+    {'title': 'Express', 'duration': '2-3 days', 'price': 9.99},
+    {'title': 'Next Day', 'duration': '1 day', 'price': 14.99},
   ];
 
   final List<Map<String, dynamic>> _paymentOptions = [
@@ -37,7 +31,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     {'icon': Icons.apple, 'title': 'Apple Pay'},
   ];
 
-  double get subtotal => 99.98;
+  double _parsePrice(dynamic price) {
+    if (price is num) return price.toDouble();
+    if (price is String) {
+      return double.tryParse(price.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
+    }
+    return 0.0;
+  }
+
+  String _formatPrice(double price) {
+    return '\$${price.toStringAsFixed(2)}';
+  }
+
+  double get subtotal {
+    return widget.selectedItems.fold(0, (sum, item) {
+      final price = _parsePrice(item['price']);
+      final quantity = item['quantity'] ?? 1;
+      return sum + (price * quantity);
+    });
+  }
+
   double get shippingPrice => _shippingOptions[_selectedShippingIndex]['price'];
   double get total => subtotal + shippingPrice;
 
@@ -51,10 +64,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Checkout',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-        ),
+        title: const Text('Checkout'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -65,17 +75,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Complete Your Purchase',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-            ),
+            const Text('Complete Your Purchase', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 24),
             _buildSection('Selected Items', _buildSelectedItems()),
             _buildSection('Shipping Method', _buildShippingOptions()),
             _buildSection('Shipping Address', _buildAddressField()),
             _buildSection('Payment Method', _buildPaymentOptions()),
             _buildSection('Order Summary', _buildOrderSummary()),
-            _buildProceedButton(context),
+            const SizedBox(height: 16),
+            _buildPlaceOrderButton(context),
           ],
         ),
       ),
@@ -86,226 +94,152 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
+        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
         content,
-        const SizedBox(height: 24),
       ],
     );
   }
 
   Widget _buildSelectedItems() {
-    return const Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Art Toy Name'),
-              Text('\$49.99'),
-              Text('Quantity: 1'),
-            ],
-          ),
-        ),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Accessory Name'),
-              Text('\$49.99'),
-              Text('Quantity: 1'),
-            ],
-          ),
-        ),
-      ],
+    return Column(
+      children: widget.selectedItems.map((item) {
+        final quantity = item['quantity'] ?? 1;
+        return ListTile(
+          leading: item['image'] != null
+              ? Image.asset(item['image'], width: 50, height: 50)
+              : const Icon(Icons.image),
+          title: Text(item['name'] ?? 'Unknown Item'),
+          subtitle: Text('Qty: $quantity'),
+        );
+      }).toList(),
     );
   }
 
   Widget _buildShippingOptions() {
     return Column(
-      children: List.generate(
-        _shippingOptions.length,
-        (index) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: _buildShippingOption(
-            title: _shippingOptions[index]['title'],
-            duration: _shippingOptions[index]['duration'],
-            price: '\$${_shippingOptions[index]['price'].toStringAsFixed(2)}',
-            isSelected: index == _selectedShippingIndex,
-            onTap: () {
-              setState(() {
-                _selectedShippingIndex = index;
-              });
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildShippingOption({
-    required String title,
-    required String duration,
-    required String price,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(
-          color: isSelected ? Colors.blue : Colors.grey.shade300,
-          width: 1,
-        ),
-      ),
-      child: ListTile(
-        title: Text(title),
-        subtitle: Text(duration),
-        trailing: Text(
-          price,
-          style: TextStyle(
-            color: isSelected ? Colors.blue : Colors.black,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        onTap: onTap,
-      ),
+      children: _shippingOptions.asMap().entries.map((entry) {
+        final index = entry.key;
+        final option = entry.value;
+        return RadioListTile<int>(
+          title: Text(option['title']),
+          subtitle: Text(option['duration']),
+          secondary: Text(_formatPrice(option['price'])),
+          value: index,
+          groupValue: _selectedShippingIndex,
+          onChanged: (value) => setState(() => _selectedShippingIndex = value!),
+        );
+      }).toList(),
     );
   }
 
   Widget _buildAddressField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
-          controller: _addressController,
-          decoration: InputDecoration(
-            hintText: 'Enter your shipping address',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            suffixIcon: IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () {},
-            ),
-            errorText:
-                _showAddressError ? 'Please enter your shipping address' : null,
-          ),
-        ),
-      ],
+    return TextField(
+      controller: _addressController,
+      decoration: InputDecoration(
+        labelText: 'Shipping Address',
+        errorText: _showAddressError ? 'Please enter address' : null,
+        border: const OutlineInputBorder(),
+      ),
+      maxLines: 3,
     );
   }
 
   Widget _buildPaymentOptions() {
     return Column(
-      children: List.generate(
-        _paymentOptions.length,
-        (index) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: _buildPaymentOption(
-            icon: _paymentOptions[index]['icon'],
-            title: _paymentOptions[index]['title'],
-            isSelected: index == _selectedPaymentIndex,
-            onTap: () {
-              setState(() {
-                _selectedPaymentIndex = index;
-              });
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentOption({
-    required IconData icon,
-    required String title,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(
-          color: isSelected ? Colors.blue : Colors.grey.shade300,
-          width: 1,
-        ),
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: isSelected ? Colors.blue : Colors.black),
-        title: Text(title),
-        trailing:
-            isSelected
-                ? const Icon(Icons.check_circle, color: Colors.blue)
-                : null,
-        onTap: onTap,
-      ),
+      children: _paymentOptions.asMap().entries.map((entry) {
+        final index = entry.key;
+        final option = entry.value;
+        return RadioListTile<int>(
+          title: Text(option['title']),
+          secondary: Icon(option['icon']),
+          value: index,
+          groupValue: _selectedPaymentIndex,
+          onChanged: (value) => setState(() => _selectedPaymentIndex = value!),
+        );
+      }).toList(),
     );
   }
 
   Widget _buildOrderSummary() {
-    return Column(
-      children: [
-        const Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [Text('Subtotal'), Text('\$99.98')],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
           children: [
-            const Text('Shipping'),
-            Text('\$${shippingPrice.toStringAsFixed(2)}'),
+            _buildSummaryRow('Subtotal', _formatPrice(subtotal)),
+            _buildSummaryRow('Shipping', _formatPrice(shippingPrice)),
+            const Divider(),
+            _buildSummaryRow('Total', _formatPrice(total), isTotal: true),
           ],
-        ),
-        const Divider(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Total', style: TextStyle(fontWeight: FontWeight.w700)),
-            Text(
-              '\$${total.toStringAsFixed(2)}',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProceedButton(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        onPressed: () {
-          if (_addressController.text.isEmpty) {
-            setState(() {
-              _showAddressError = true;
-            });
-          } else {
-            Navigator.pushNamed(context, '/tracking');
-            setState(() {
-              _showAddressError = false;
-            });
-          }
-        },
-        child: const Text(
-          'Proceed to Payment',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
         ),
       ),
     );
   }
+
+  Widget _buildSummaryRow(String label, String value, {bool isTotal = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(
+            fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+            fontSize: isTotal ? 18 : 16,
+          )),
+          Text(value, style: TextStyle(
+            fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+            fontSize: isTotal ? 18 : 16,
+            color: isTotal ? Colors.blue : Colors.black,
+          )),
+        ],
+      ),
+    );
+  }
+
+  // In your _buildPlaceOrderButton method:
+// In your _buildPlaceOrderButton method:
+Widget _buildPlaceOrderButton(BuildContext context) {
+  return SizedBox(
+    width: double.infinity,
+    child: ElevatedButton(
+      onPressed: () {
+        if (_addressController.text.isEmpty) {
+          setState(() => _showAddressError = true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please enter shipping address')),
+          );
+          return;
+        }
+
+        try {
+          CartService.placeOrder({
+            'items': widget.selectedItems,
+            'shipping': _shippingOptions[_selectedShippingIndex],
+            'payment': _paymentOptions[_selectedPaymentIndex],
+            'address': _addressController.text,
+            'total': total,
+          });
+          
+          // Navigate to Home and clear stack
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/home',
+            (route) => false,
+          );
+          
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Payment successful')),
+          );
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error occurred: ${e.toString()}')),
+          );
+        }
+      },
+      child: const Text('Complete Payment'),
+    ),
+  );
+}
 }
