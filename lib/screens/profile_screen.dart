@@ -15,10 +15,8 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   File? _profileImage;
-  final ImagePicker _picker = ImagePicker();
   bool _isUploading = false;
   late List<CameraDescription> _cameras;
-  bool _isCameraInitialized = false;
 
   @override
   void initState() {
