@@ -34,7 +34,7 @@ class _WatchlistScreenState extends State<WatchlistPage> {
     );
   }
 
-  Widget _buildWatchlistItem(Map<String, String> item, BuildContext context) {
+  Widget _buildWatchlistItem(Map<String, dynamic> item, BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
@@ -49,8 +49,9 @@ class _WatchlistScreenState extends State<WatchlistPage> {
               builder: (context) => ProductDetailPage(
                 product: item,
                 onWatchlistChanged: () {
-                setState(() {});
-              }, productName: '',
+                  setState(() {});
+                },
+                productName: item['name'] ?? '',
               ),
             ),
           );
@@ -60,21 +61,26 @@ class _WatchlistScreenState extends State<WatchlistPage> {
           children: [
             Container(
               height: 200,
-              decoration: const BoxDecoration(
-                borderRadius: BorderRadius.only(
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(12),
                   topRight: Radius.circular(12),
                 ),
-                color: Colors.grey,
+                color: Colors.grey.shade200,
               ),
-              child: Center(
-                child: Text(
-                  'Product Image',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ),
+              child: item['image'] != null
+                  ? Image.asset(
+                      item['image'],
+                      fit: BoxFit.cover,
+                    )
+                  : Center(
+                      child: Text(
+                        'Product Image',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
             ),
             Padding(
               padding: const EdgeInsets.all(16),
@@ -82,7 +88,7 @@ class _WatchlistScreenState extends State<WatchlistPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item['name']!,
+                    item['name']?.toString() ?? 'No Name',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
@@ -90,7 +96,7 @@ class _WatchlistScreenState extends State<WatchlistPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    item['price']!,
+                    '\$${(item['price'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
                     style: const TextStyle(
                       fontSize: 16,
                       color: Colors.blue,
@@ -99,7 +105,7 @@ class _WatchlistScreenState extends State<WatchlistPage> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    item['description']!,
+                    item['description']?.toString() ?? 'No description',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade700,
@@ -116,7 +122,7 @@ class _WatchlistScreenState extends State<WatchlistPage> {
                         ),
                         onPressed: () {
                           setState(() {
-                            WatchlistService.removeFromWatchlist(item['name']!);
+                            WatchlistService.removeFromWatchlist(item['name']?.toString() ?? '');
                           });
                         },
                       ),

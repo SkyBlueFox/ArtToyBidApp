@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'product_detail_screen.dart';
 import 'watchlist_service.dart';
+import 'filtered_products_screen.dart';
 
 class CategoriesPage extends StatefulWidget {
   const CategoriesPage({super.key});
@@ -19,32 +20,70 @@ class _CategoriesPageState extends State<CategoriesPage> {
     'Sold'
   ];
 
+  final List<String> _categories = [
+    'Bearbrick',
+    'Designer Toy',
+    'Dunny',
+    'Funko',
+    'Kaws',
+    'Supreme'
+  ];
+
   final List<Map<String, dynamic>> _popularItems = [
     {
       'name': 'Supreme x Kaws Chum',
-      'price': '\$4,000',
+      'price': 4000.0,
       'description': 'Limited edition collaboration figure',
       'image': 'assets/images/kaws_chum.jpg',
+      'type': 'Auction',
+      'category': 'Kaws',
     },
     {
       'name': 'Bearbrick 400% Medicom',
-      'price': '\$2,500',
+      'price': 2500.0,
       'description': 'Collectible designer toy',
       'image': 'assets/images/bearbrick.jpg',
+      'type': 'Buy Now',
+      'category': 'Bearbrick',
     },
     {
       'name': 'KAWS Companion',
-      'price': '\$2,800',
+      'price': 2800.0,
       'description': 'Classic KAWS Companion figure',
       'image': 'assets/images/kaws_companion.jpg',
+      'type': 'Auction',
+      'category': 'Kaws',
     },
     {
       'name': 'Funko Pop! Batman',
-      'price': '\$50',
+      'price': 50.0,
       'description': 'Limited edition Batman collectible',
       'image': 'assets/images/funko_batman.jpg',
+      'type': 'Buy Now',
+      'category': 'Funko',
     },
   ];
+
+  void _navigateToFilteredProducts(String filterType, String? category) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FilteredProductsPage(
+          filterType: filterType,
+          category: category,
+          products: _getFilteredProducts(filterType, category),
+        ),
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _getFilteredProducts(String filterType, String? category) {
+    return _popularItems.where((item) {
+      final matchesFilter = filterType == 'All' || item['type'] == filterType;
+      final matchesCategory = category == null || item['category'] == category;
+      return matchesFilter && matchesCategory;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +103,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Filter Chips
             SizedBox(
               height: 50,
               child: ListView(
@@ -80,6 +120,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                         setState(() {
                           _selectedFilterIndex = selected ? index : 0;
                         });
+                        _navigateToFilteredProducts(_filters[index], null);
                       },
                       selectedColor: Colors.blue.withOpacity(0.2),
                       checkmarkColor: Colors.blue,
@@ -94,6 +135,16 @@ class _CategoriesPageState extends State<CategoriesPage> {
               ),
             ),
             const SizedBox(height: 16),
+            
+            // Categories Grid
+            const Text(
+              'Categories',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
             GridView.count(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -101,15 +152,12 @@ class _CategoriesPageState extends State<CategoriesPage> {
               childAspectRatio: 1.2,
               mainAxisSpacing: 16,
               crossAxisSpacing: 16,
-              children: [
-                _buildCategoryItem('Bearbrick', Icons.toys),
-                _buildCategoryItem('Designer Toy', Icons.style),
-                _buildCategoryItem('Dunny', Icons.palette),
-                _buildCategoryItem('Funko', Icons.face),
-                _buildCategoryItem('Kaws', Icons.brush),
-                _buildCategoryItem('Supreme', Icons.star),
-              ],
+              children: _categories.map((category) {
+                return _buildCategoryItem(category, _getCategoryIcon(category));
+              }).toList(),
             ),
+            
+            // Popular Items
             const SizedBox(height: 24),
             const Text(
               'Popular in Categories',
@@ -136,6 +184,25 @@ class _CategoriesPageState extends State<CategoriesPage> {
     );
   }
 
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Bearbrick':
+        return Icons.toys;
+      case 'Designer Toy':
+        return Icons.style;
+      case 'Dunny':
+        return Icons.palette;
+      case 'Funko':
+        return Icons.face;
+      case 'Kaws':
+        return Icons.brush;
+      case 'Supreme':
+        return Icons.star;
+      default:
+        return Icons.category;
+    }
+  }
+
   Widget _buildCategoryItem(String title, IconData icon) {
     return Card(
       elevation: 0,
@@ -149,8 +216,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          // Handle category tap
-          // You could navigate to a filtered list screen here
+          _navigateToFilteredProducts('All', title);
         },
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -177,11 +243,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
           context,
           MaterialPageRoute(
             builder: (context) => ProductDetailPage(
-              product: {
-                'name': product['name'],
-                'price': product['price'],
-                'description': product['description'],
-              },
+              product: product,
               onWatchlistChanged: () {
                 setState(() {});
               },
@@ -219,7 +281,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              product['name'] ?? 'Unknown Product',
+              product['name'],
               style: const TextStyle(
                 fontWeight: FontWeight.w600,
               ),
@@ -228,7 +290,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
             ),
             const SizedBox(height: 4),
             Text(
-              product['price'] ?? 'Price not available',
+              '\$${product['price'].toStringAsFixed(2)}',
               style: const TextStyle(
                 color: Colors.blue,
                 fontWeight: FontWeight.w700,
@@ -236,25 +298,36 @@ class _CategoriesPageState extends State<CategoriesPage> {
             ),
             const SizedBox(height: 4),
             Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: _getTypeColor(product['type']),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    product['type'],
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
                 IconButton(
                   icon: Icon(
                     WatchlistService.isInWatchlist(product['name'])
                         ? Icons.favorite
                         : Icons.favorite_border,
                     color: Colors.red,
+                    size: 20,
                   ),
                   onPressed: () {
                     setState(() {
                       if (WatchlistService.isInWatchlist(product['name'])) {
                         WatchlistService.removeFromWatchlist(product['name']);
                       } else {
-                        WatchlistService.addToWatchlist({
-                          'name': product['name'],
-                          'price': product['price'],
-                          'description': product['description'],
-                        });
+                        WatchlistService.addToWatchlist(product);
                       }
                     });
                   },
@@ -265,6 +338,21 @@ class _CategoriesPageState extends State<CategoriesPage> {
         ),
       ),
     );
+  }
+
+  Color _getTypeColor(String type) {
+    switch (type) {
+      case 'Auction':
+        return Colors.orange;
+      case 'Buy Now':
+        return Colors.green;
+      case 'Open Editions':
+        return Colors.purple;
+      case 'Sold':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
   }
 
   BottomNavigationBar _buildBottomNavBar(BuildContext context, int currentIndex) {
