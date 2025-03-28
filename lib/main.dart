@@ -49,10 +49,7 @@ class ArtToyApp extends StatelessWidget {
         appBarTheme: const AppBarTheme(
           elevation: 0,
           centerTitle: true,
-          titleTextStyle: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
+          titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
       ),
       darkTheme: ThemeData.dark().copyWith(
@@ -60,24 +57,21 @@ class ArtToyApp extends StatelessWidget {
         appBarTheme: const AppBarTheme(
           elevation: 0,
           centerTitle: true,
-          titleTextStyle: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
+          titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
       ),
       themeMode: themeProvider.themeMode,
       initialRoute:
-          FirebaseAuth.instance.currentUser == null ? '/signin' : '/home', // Fixed to match route name
+          FirebaseAuth.instance.currentUser == null ? '/signin' : '/home',
       routes: {
-        '/signin': (context) => const SignInScreen(),
+        '/signin': (context) => const SignInPage(),
         '/verify': (context) => const VerifyIdentityPage(),
         '/home': (context) => const HomePage(),
         '/categories': (context) => const CategoriesPage(),
         '/notifications': (context) => const NotificationsPage(),
         '/watchlist': (context) => const WatchlistPage(),
         '/settings': (context) => const SettingsPage(),
-        '/profile': (context) => const ProfileScreen(),
+        '/profile': (context) => const ProfilePage(),
         '/community': (context) => const CommunityPage(),
         '/tracking': (context) => const TrackingPage(),
         '/cart': (context) => CartScreen(),
@@ -87,26 +81,26 @@ class ArtToyApp extends StatelessWidget {
           case '/product':
             final args = settings.arguments as Map<String, dynamic>;
             return MaterialPageRoute(
-              builder: (context) => ProductDetailPage(
-                product: args['product'],
-                onWatchlistChanged: args['onWatchlistChanged'],
-                productName: args['productName'] ?? '',
-              ),
+              builder:
+                  (context) => ProductDetailPage(
+                    product: args['product'],
+                    onWatchlistChanged: args['onWatchlistChanged'],
+                    productName: args['productName'] ?? '',
+                  ),
             );
           case '/checkout':
             final args = settings.arguments as Map<String, dynamic>;
             return MaterialPageRoute(
-              builder: (context) => CheckoutPage(
-                selectedItems: args['selectedItems'],
-              ),
+              builder:
+                  (context) =>
+                      CheckoutPage(selectedItems: args['selectedItems']),
             );
           default:
             return MaterialPageRoute(
-              builder: (context) => const Scaffold(
-                body: Center(
-                  child: Text('Page not found!'),
-                ),
-              ),
+              builder:
+                  (context) => const Scaffold(
+                    body: Center(child: Text('Page not found!')),
+                  ),
             );
         }
       },
