@@ -1,7 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../services/user_service.dart';
 
 class VerifyIdentityPage extends StatelessWidget {
-  const VerifyIdentityPage({super.key});
+  VerifyIdentityPage({super.key});
+  final UserService userService = UserService();
 
   @override
   Widget build(BuildContext context) {
@@ -51,12 +54,19 @@ class VerifyIdentityPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                onPressed: () {
-                  Navigator.pushNamedAndRemoveUntil(
-                    context,
-                    '/home',
-                    (route) => false,
-                  );
+                onPressed: () async {
+                  final uid = FirebaseAuth.instance.currentUser?.uid;
+                  if (uid != null) {
+                    await userService.createUser(
+                      uid: uid,
+                      joinedTime: DateTime.now(),
+                    );
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/home',
+                      (route) => false,
+                    );
+                  }
                 },
                 child: const Text(
                   'Continue',

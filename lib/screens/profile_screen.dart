@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:camera/camera.dart';
 import 'dart:io';
 import 'dart:async';
+import '../services/google_drive_service.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -16,32 +17,46 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  late final GoogleDriveService _driveService;
+  // ignore: unused_field
+  bool _isDriveServiceInitialized = false;
   User? _currentUser;
   File? _profileImage;
   bool _isUploading = false;
   late List<CameraDescription> _cameras;
   StreamSubscription<User?>? _authSubscription;
+  final String _googleDriveFolderId = '1i6JfYzdY5nMtZEhdk4o0qBzIsmN9DrMP';
 
   @override
   void initState() {
     super.initState();
-    _initializeCameras();
-    _loadUser(); // Load initial data
-    _setupAuthListener(); // Listen for future changes
+    _driveService = GoogleDriveService();
+    _initializeServices();
+    _loadUser();
+    _setupAuthListener();
+  }
+
+  Future<void> _initializeServices() async {
+    try {
+      _cameras = await availableCameras();
+      await _driveService.initialize(folderId: _googleDriveFolderId);
+
+      if (mounted) {
+        setState(() {
+          _isDriveServiceInitialized = true;
+        });
+      }
+    } on CameraException catch (e) {
+      _showErrorSnackbar('Camera Error: ${e.description}');
+    } catch (e) {
+      _showErrorSnackbar('Initialization Error: $e');
+    }
   }
 
   @override
   void dispose() {
     _authSubscription?.cancel();
     super.dispose();
-  }
-
-  Future<void> _initializeCameras() async {
-    try {
-      _cameras = await availableCameras();
-    } on CameraException catch (e) {
-      _showErrorSnackbar('Camera Error: ${e.description}');
-    }
   }
 
   Future<void> _showImageSourceDialog() async {
@@ -78,7 +93,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     onTap: () {
                       Navigator.pop(context);
-                      _deleteImage();
+                      _deleteProfileImage();
                     },
                   ),
               ],
@@ -93,18 +108,109 @@ class _ProfilePageState extends State<ProfilePage> {
       return;
     }
 
-    Navigator.push(
+    final imageFile = await Navigator.push<File>(
       context,
       MaterialPageRoute(
         builder:
             (context) => CameraPage(
-              cameras: _cameras, // Pass entire list
+              cameras: _cameras,
               onImageCaptured: (File imageFile) {
-                setState(() => _profileImage = imageFile);
+                return imageFile;
               },
             ),
       ),
     );
+
+    if (imageFile != null && mounted) {
+      await _uploadAndSetProfileImage(imageFile);
+    } else {}
+  }
+
+  Future<void> _uploadAndSetProfileImage(File imageFile) async {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _isUploading = true);
+
+    try {
+      final userId = _currentUser?.uid;
+      if (userId == null) {
+        throw Exception('User not logged in');
+      }
+
+      // First, check if user already has a profile image
+      final existingFileId = await _driveService.findUserProfileImage(userId);
+
+      if (existingFileId != null) {
+        final success = await _driveService.deleteProfileImage(existingFileId);
+        if (!success) throw Exception('Failed to delete existing image');
+      }
+
+      final imageUrl = await _driveService.uploadProfileImage(
+        imageFile,
+        userId,
+      );
+
+      if (imageUrl == null) {
+        throw Exception('Upload failed');
+      }
+
+      await _currentUser?.updatePhotoURL(imageUrl);
+
+      await _refreshUser();
+
+      // Update local state to show the new image
+      if (mounted) {
+        setState(() {
+          _profileImage = imageFile;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackbar('Upload failed: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploading = false);
+      }
+    }
+  }
+
+  Future<void> _deleteProfileImage() async {
+    if (!mounted) return;
+
+    setState(() => _isUploading = true);
+    try {
+      final userId = _currentUser?.uid;
+      if (userId == null) throw Exception('User not logged in');
+
+      // Find and delete from Google Drive
+      final fileId = await _driveService.findUserProfileImage(userId);
+      if (fileId != null) {
+        final success = await _driveService.deleteProfileImage(fileId);
+        if (!success) throw Exception('Failed to delete from Drive');
+      }
+
+      // Update Firebase Auth
+      await _currentUser?.updatePhotoURL(null);
+      await _refreshUser();
+
+      // Clear local state
+      if (mounted) {
+        setState(() {
+          _profileImage = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackbar('Failed to delete: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploading = false);
+      }
+    }
   }
 
   Future<void> _pickImage() async {
@@ -126,18 +232,18 @@ class _ProfilePageState extends State<ProfilePage> {
       final XFile? pickedFile = await ImagePicker().pickImage(
         source: ImageSource.gallery,
         imageQuality: 80,
-        requestFullMetadata: false, // Important for Pixel devices
+        requestFullMetadata: false,
       );
 
       if (pickedFile != null) {
-        setState(() => _profileImage = File(pickedFile.path));
+        final imageFile = File(pickedFile.path);
+        await _uploadAndSetProfileImage(imageFile);
       } else {
         _showErrorSnackbar('No image selected');
       }
     } on PlatformException catch (e) {
       _handlePixelSpecificError(e);
     } catch (e) {
-      debugPrint('Image picker error: $e');
       _showErrorSnackbar('Failed to access photos');
     } finally {
       setState(() => _isUploading = false);
@@ -151,19 +257,6 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     } else {
       _showErrorSnackbar('Pixel photos access error: ${e.message}');
-    }
-  }
-
-  Future<void> _deleteImage() async {
-    try {
-      setState(() => _isUploading = true);
-      setState(() {
-        _profileImage = null;
-        _isUploading = false;
-      });
-    } catch (e) {
-      setState(() => _isUploading = false);
-      _showErrorSnackbar('Failed to delete image: ${e.toString()}');
     }
   }
 
@@ -231,13 +324,19 @@ class _ProfilePageState extends State<ProfilePage> {
                     children: [
                       CircleAvatar(
                         radius: 40,
-                        backgroundColor: Colors.grey,
                         backgroundImage:
                             _profileImage != null
-                                ? FileImage(_profileImage!)
+                                ? FileImage(
+                                  _profileImage!,
+                                ) // Show local image if just uploaded
+                                : _currentUser?.photoURL != null
+                                ? NetworkImage(
+                                  _currentUser!.photoURL!,
+                                ) // Show from Firebase
                                 : null,
                         child:
-                            _profileImage == null
+                            _profileImage == null &&
+                                    _currentUser?.photoURL == null
                                 ? const Icon(
                                   Icons.person,
                                   size: 40,
@@ -267,7 +366,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  user?.displayName ?? 'No username set',
+                  user?.displayName ?? user?.email ?? 'Guest User',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
@@ -471,14 +570,19 @@ class _CameraPageState extends State<CameraPage> {
   Future<void> _takePicture() async {
     if (_isInitializing ||
         _controller == null ||
-        !_controller!.value.isInitialized)
+        !_controller!.value.isInitialized) {
       return;
+    }
 
     try {
       final image = await _controller!.takePicture();
-      if (!mounted) return;
+
+      if (!mounted) {
+        return;
+      }
+
       widget.onImageCaptured(File(image.path));
-      Navigator.pop(context);
+      Navigator.pop(context, File(image.path));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(

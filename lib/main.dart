@@ -1,8 +1,6 @@
 import 'package:bid/firebase_options.dart';
-import 'package:bid/screens/cart_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_ui_auth/firebase_ui_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:bid/providers/theme_provider.dart';
@@ -19,7 +17,6 @@ import 'package:bid/screens/watchlist_screen.dart';
 import 'package:bid/screens/settings_screen.dart';
 import 'package:bid/screens/profile_screen.dart';
 import 'package:bid/screens/community_screen.dart';
-import 'package:bid/services/cart_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,7 +62,7 @@ class ArtToyApp extends StatelessWidget {
           FirebaseAuth.instance.currentUser == null ? '/signin' : '/home',
       routes: {
         '/signin': (context) => const SignInPage(),
-        '/verify': (context) => const VerifyIdentityPage(),
+        '/verify': (context) => VerifyIdentityPage(),
         '/home': (context) => const HomePage(),
         '/categories': (context) => const CategoriesPage(),
         '/notifications': (context) => const NotificationsPage(),

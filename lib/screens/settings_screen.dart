@@ -1,3 +1,4 @@
+import 'package:bid/services/user_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +12,7 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  UserService userService = UserService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   late TextEditingController _usernameController;
   bool _isEditing = false;
