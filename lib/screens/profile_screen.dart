@@ -1,3 +1,5 @@
+import 'package:bid/screens/settings_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -14,14 +16,24 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  User? _currentUser;
   File? _profileImage;
   bool _isUploading = false;
   late List<CameraDescription> _cameras;
+  StreamSubscription<User?>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
     _initializeCameras();
+    _loadUser(); // Load initial data
+    _setupAuthListener(); // Listen for future changes
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _initializeCameras() async {
@@ -161,15 +173,49 @@ class _ProfilePageState extends State<ProfilePage> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  void _loadUser() {
+    setState(() {
+      _currentUser = FirebaseAuth.instance.currentUser;
+    });
+  }
+
+  void _setupAuthListener() {
+    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      if (mounted) {
+        setState(() => _currentUser = user); // Update if auth state changes
+      }
+    });
+  }
+
+  Future<void> _refreshUser() async {
+    try {
+      await FirebaseAuth.instance.currentUser
+          ?.reload(); // Force Firebase refresh
+      _loadUser(); // Update UI
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error refreshing: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () => Navigator.pushNamed(context, '/settings'),
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsPage()),
+              );
+              await _refreshUser();
+            },
           ),
         ],
       ),
@@ -220,8 +266,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Lois Beckett',
+                Text(
+                  user?.displayName ?? 'No username set',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),

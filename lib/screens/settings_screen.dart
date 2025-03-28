@@ -1,13 +1,55 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  late TextEditingController _usernameController;
+  bool _isEditing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = _auth.currentUser;
+    _usernameController = TextEditingController(
+      text: user?.displayName ?? 'No username set',
+    );
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _updateUsername() async {
+    try {
+      await _auth.currentUser?.updateDisplayName(_usernameController.text);
+      setState(() {
+        _isEditing = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Username updated successfully')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update username: ${e.toString()}')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final user = _auth.currentUser;
 
     return Scaffold(
       appBar: AppBar(
@@ -15,10 +57,57 @@ class SettingsPage extends StatelessWidget {
           'Settings',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
+        actions: [
+          if (_isEditing)
+            IconButton(
+              icon: const Icon(Icons.check),
+              onPressed: _updateUsername,
+            ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          const Text(
+            'Profile',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: CircleAvatar(
+              radius: 24,
+              backgroundImage:
+                  user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
+              child: user?.photoURL == null ? const Icon(Icons.person) : null,
+            ),
+            title:
+                _isEditing
+                    ? TextField(
+                      controller: _usernameController,
+                      decoration: const InputDecoration(
+                        hintText: 'Enter new username',
+                        border: InputBorder.none,
+                      ),
+                    )
+                    : Text(
+                      user?.displayName ?? 'No username set',
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+            subtitle: Text(user?.email ?? ''),
+            trailing: IconButton(
+              icon: Icon(_isEditing ? Icons.close : Icons.edit),
+              onPressed: () {
+                setState(() {
+                  _isEditing = !_isEditing;
+                  if (!_isEditing) {
+                    _usernameController.text = user?.displayName ?? '';
+                  }
+                });
+              },
+            ),
+          ),
+          const Divider(height: 32),
           const Text(
             'Display Mode',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -59,12 +148,23 @@ class SettingsPage extends StatelessWidget {
           const Divider(height: 32),
           ListTile(
             title: const Text('Log Out', style: TextStyle(color: Colors.red)),
-            onTap: () {
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/sign-in',
-                (route) => false,
-              );
+            onTap: () async {
+              try {
+                await FirebaseAuth.instance.signOut();
+
+                // 3. Reset app state (example using Provider)
+                // context.read<UserProvider>().clearUser();
+
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/signin',
+                  (route) => false,
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Logout failed: ${e.toString()}')),
+                );
+              }
             },
           ),
         ],
@@ -152,13 +252,13 @@ class SettingsPage extends StatelessWidget {
             );
             break;
           case 1:
-            Navigator.pushNamed(context, '/categories');
+            Navigator.pushReplacementNamed(context, '/categories');
             break;
           case 2:
-            Navigator.pushNamed(context, '/watchlist');
+            Navigator.pushReplacementNamed(context, '/watchlist');
             break;
           case 3:
-            Navigator.pushNamed(context, '/profile');
+            Navigator.pushReplacementNamed(context, '/profile');
             break;
         }
       },

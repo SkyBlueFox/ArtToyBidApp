@@ -9,16 +9,9 @@ class VerifyIdentityPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text(
           'Verify your identity',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(24),
@@ -60,7 +53,10 @@ class VerifyIdentityPage extends StatelessWidget {
                 ),
                 onPressed: () {
                   Navigator.pushNamedAndRemoveUntil(
-                    context, '/home', (route) => false);
+                    context,
+                    '/home',
+                    (route) => false,
+                  );
                 },
                 child: const Text(
                   'Continue',
@@ -87,10 +83,7 @@ class VerifyIdentityPage extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(
-          color: Colors.grey.shade300,
-          width: 1,
-        ),
+        side: BorderSide(color: Colors.grey.shade300, width: 1),
       ),
       child: ListTile(
         leading: Icon(icon, size: 32, color: Colors.blue),
