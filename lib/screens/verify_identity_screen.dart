@@ -304,10 +304,7 @@ class _VerifyIdentityPageState extends State<VerifyIdentityPage> {
                 onPressed:
                     _isBinValid
                         ? () {
-                          Navigator.pop(
-                            context,
-                            _cardController.text.replaceAll(RegExp(r'\s+'), ''),
-                          );
+                          Navigator.pushReplacementNamed(context, '/home');
                         }
                         : null,
                 child: const Text(
