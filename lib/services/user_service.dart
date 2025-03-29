@@ -9,7 +9,8 @@ class UserService {
   Future<void> createUser({
     required String uid,
     String? profilePictureUrl,
-    required DateTime joinedTime,
+    required DateTime joinedTime, 
+    required bool paymentMethodVerified,
   }) async {
     try {
       await users.doc(uid).set({
