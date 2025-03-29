@@ -4,124 +4,129 @@ import 'package:flutter/services.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:mime/mime.dart';
-import 'package:path/path.dart';
 
 class GoogleDriveService {
+  static const _profileImagesFolderId = '1i6JfYzdY5nMtZEhdk4o0qBzIsmN9DrMP';
+  static const _productImagesFolderId = '1fJiu7nuBwlMnTq96-HsoFxP6MITQnLzB';
+
   static final _instance = GoogleDriveService._internal();
   static const _scopes = [drive.DriveApi.driveFileScope];
 
   bool _isInitialized = false;
   late Map<String, dynamic> _credentials;
-  String? _folderId;
 
-  // Singleton pattern
   factory GoogleDriveService() => _instance;
+
   GoogleDriveService._internal();
 
-  Future<void> initialize({String? folderId}) async {
+  Future<void> initialize() async {
     if (_isInitialized) return;
-
+    
     try {
-      // Load credentials
       final jsonString = await rootBundle.loadString("assets/credentials.json");
-      print(jsonString);
       _credentials = jsonDecode(jsonString);
-      _folderId = folderId;
       _isInitialized = true;
-      print('GoogleDriveService initialized successfully');
     } catch (e) {
-      print('GoogleDriveService initialization failed: $e');
-      throw Exception('Failed to initialize GoogleDriveService: $e');
+      throw Exception('Google Drive initialization failed: $e');
     }
   }
 
   Future<drive.DriveApi> _getDriveApi() async {
-    if (!_isInitialized) {
-      throw Exception('GoogleDriveService must be initialized first');
-    }
-
-    try {
-      final credentials = ServiceAccountCredentials.fromJson(_credentials);
-      final client = await clientViaServiceAccount(credentials, _scopes);
-      return drive.DriveApi(client);
-    } catch (e) {
-      print('Drive API creation failed: $e');
-      throw Exception('Failed to create Drive API client: $e');
-    }
+    if (!_isInitialized) throw Exception('Service not initialized');
+    final credentials = ServiceAccountCredentials.fromJson(_credentials);
+    final client = await clientViaServiceAccount(credentials, _scopes);
+    return drive.DriveApi(client);
   }
 
-  Future<String?> uploadProfileImage(File imageFile, String userId) async {
+  // ================ Profile Image Operations ================
+  Future<String> uploadProfileImage(File image, String userId) => 
+      _uploadImage(image, 'profile_$userId', _profileImagesFolderId);
+
+  Future<bool> deleteProfileImage(String userId) => 
+      _deleteImage('profile_$userId', _profileImagesFolderId);
+
+  Future<String?> findProfileImage(String userId) => 
+      _findImage('profile_$userId', _profileImagesFolderId);
+
+  // ================ Product Image Operations ================
+  Future<String> uploadProductImage(File image, String productId) => 
+      _uploadImage(image, 'product_$productId', _productImagesFolderId);
+
+  Future<bool> deleteProductImage(String productId) => 
+      _deleteImage('product_$productId', _productImagesFolderId);
+
+  Future<String?> findProductImage(String productId) => 
+      _findImage('product_$productId', _productImagesFolderId);
+
+  // ======================= Core Methods ======================
+  Future<String> _uploadImage(
+    File image, 
+    String fileName, 
+    String folderId,
+  ) async {
     try {
       final driveApi = await _getDriveApi();
-      final fileName = 'profile_$userId${extension(imageFile.path)}';
-      final mimeType = lookupMimeType(imageFile.path) ?? 'image/jpeg';
+      final mimeType = lookupMimeType(image.path) ?? 'image/jpeg';
 
-      final file =
-          drive.File()
-            ..name = fileName
-            ..parents = [_folderId!];
+      // Delete existing image if exists
+      await _deleteImage(fileName, folderId);
 
-      print('Uploading $fileName to Google Drive...');
+      // Create new file with forced .jpg extension
+      final file = drive.File()
+        ..name = '$fileName.jpg'
+        ..parents = [folderId];
+
       final response = await driveApi.files.create(
         file,
         uploadMedia: drive.Media(
-          imageFile.openRead(),
-          imageFile.lengthSync(),
+          image.openRead(),
+          await image.length(),
           contentType: mimeType,
         ),
       );
 
-      print('Making file publicly accessible...');
-      await driveApi.permissions.create(
-        drive.Permission()
-          ..role = 'reader'
-          ..type = 'anyone',
-        response.id!,
-      );
-
-      final imageUrl =
-          'https://drive.google.com/uc?export=view&id=${response.id}';
-      print('Upload successful! URL: $imageUrl');
-      return imageUrl;
+      await _makeFilePublic(driveApi, response.id!);
+      return 'https://drive.google.com/uc?export=view&id=${response.id}';
     } catch (e) {
-      print('Upload failed: $e');
-      rethrow;
+      throw Exception('Image upload failed: ${e.toString()}');
     }
   }
 
-  Future<bool> deleteProfileImage(String fileId) async {
+  Future<bool> _deleteImage(String fileName, String folderId) async {
     try {
+      final fileId = await _findImage(fileName, folderId);
+      if (fileId == null) return true;
+
       final driveApi = await _getDriveApi();
-      print('Deleting file $fileId from Google Drive...');
       await driveApi.files.delete(fileId);
-      print('Deletion successful');
       return true;
     } catch (e) {
-      print('Deletion failed: $e');
+      print('Image deletion failed: $e');
       return false;
     }
   }
 
-  Future<String?> findUserProfileImage(String userId) async {
+  Future<String?> _findImage(String fileName, String folderId) async {
     try {
       final driveApi = await _getDriveApi();
-      print('Searching for profile image of user $userId...');
       final response = await driveApi.files.list(
-        q: "'$_folderId' in parents and name contains 'profile_$userId'",
+        q: "'$folderId' in parents and name = '$fileName.jpg'",
         spaces: 'drive',
-        $fields: 'files(id)',
+        $fields: 'files(id, name)',
       );
-
-      if (response.files?.isNotEmpty == true) {
-        final fileId = response.files!.first.id;
-        print('Found profile image with ID: $fileId');
-        return fileId;
-      }
-      print('No profile image found for user $userId');
-      return null;
+      return response.files?.firstOrNull?.id;
     } catch (e) {
-      print('Search failed: $e');
-      rethrow;
+      print('Image search failed: $e');
+      return null;
     }
+  }
+
+  Future<void> _makeFilePublic(drive.DriveApi api, String fileId) async {
+    await api.permissions.create(
+      drive.Permission()
+        ..role = 'reader'
+        ..type = 'anyone',
+      fileId,
+    );
   }
 }

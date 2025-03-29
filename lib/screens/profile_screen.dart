@@ -18,14 +18,11 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   late final GoogleDriveService _driveService;
-  // ignore: unused_field
-  bool _isDriveServiceInitialized = false;
   User? _currentUser;
   File? _profileImage;
   bool _isUploading = false;
   late List<CameraDescription> _cameras;
   StreamSubscription<User?>? _authSubscription;
-  final String _googleDriveFolderId = '1i6JfYzdY5nMtZEhdk4o0qBzIsmN9DrMP';
 
   @override
   void initState() {
@@ -39,13 +36,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _initializeServices() async {
     try {
       _cameras = await availableCameras();
-      await _driveService.initialize(folderId: _googleDriveFolderId);
-
-      if (mounted) {
-        setState(() {
-          _isDriveServiceInitialized = true;
-        });
-      }
+      await _driveService.initialize();
     } on CameraException catch (e) {
       _showErrorSnackbar('Camera Error: ${e.description}');
     } catch (e) {
@@ -127,44 +118,26 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _uploadAndSetProfileImage(File imageFile) async {
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     setState(() => _isUploading = true);
 
     try {
       final userId = _currentUser?.uid;
-      if (userId == null) {
-        throw Exception('User not logged in');
-      }
+      if (userId == null) throw Exception('User not logged in');
 
-      // First, check if user already has a profile image
-      final existingFileId = await _driveService.findUserProfileImage(userId);
-
-      if (existingFileId != null) {
-        final success = await _driveService.deleteProfileImage(existingFileId);
-        if (!success) throw Exception('Failed to delete existing image');
-      }
-
+      // The service automatically handles existing file deletion
       final imageUrl = await _driveService.uploadProfileImage(
         imageFile,
         userId,
       );
 
-      if (imageUrl == null) {
-        throw Exception('Upload failed');
-      }
-
+      // Update Firebase user
       await _currentUser?.updatePhotoURL(imageUrl);
-
       await _refreshUser();
 
-      // Update local state to show the new image
       if (mounted) {
-        setState(() {
-          _profileImage = imageFile;
-        });
+        setState(() => _profileImage = imageFile);
       }
     } catch (e) {
       if (mounted) {
@@ -185,22 +158,17 @@ class _ProfilePageState extends State<ProfilePage> {
       final userId = _currentUser?.uid;
       if (userId == null) throw Exception('User not logged in');
 
-      // Find and delete from Google Drive
-      final fileId = await _driveService.findUserProfileImage(userId);
-      if (fileId != null) {
-        final success = await _driveService.deleteProfileImage(fileId);
-        if (!success) throw Exception('Failed to delete from Drive');
+      final success = await _driveService.deleteProfileImage(userId);
+
+      if (!success) {
+        throw Exception('Failed to remove profile picture');
       }
 
-      // Update Firebase Auth
       await _currentUser?.updatePhotoURL(null);
       await _refreshUser();
 
-      // Clear local state
       if (mounted) {
-        setState(() {
-          _profileImage = null;
-        });
+        setState(() => _profileImage = null);
       }
     } catch (e) {
       if (mounted) {
