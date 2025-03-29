@@ -52,17 +52,32 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final user = _auth.currentUser;
+    final isDarkMode = themeProvider.isDarkMode;
+    final textColor = isDarkMode ? Colors.white : Colors.black;
+    final iconColor = isDarkMode ? Colors.white : Colors.black;
+    final backgroundColor = isDarkMode ? Colors.grey[900] : Colors.white;
+    final dividerColor = isDarkMode ? Colors.grey[800] : Colors.grey[200];
+    final subtitleColor = isDarkMode ? Colors.grey[400] : Colors.grey[600];
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Settings',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        title: Center(
+          child: Text(
+            'Settings',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
+          ),
         ),
+        centerTitle: true,
+        iconTheme: IconThemeData(color: iconColor),
+        backgroundColor: backgroundColor,
         actions: [
           if (_isEditing)
             IconButton(
-              icon: const Icon(Icons.check),
+              icon: Icon(Icons.check, color: iconColor),
               onPressed: _updateUsername,
             ),
         ],
@@ -70,9 +85,13 @@ class _SettingsPageState extends State<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
+          Text(
             'Profile',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
           ),
           const SizedBox(height: 8),
           ListTile(
@@ -81,24 +100,34 @@ class _SettingsPageState extends State<SettingsPage> {
               radius: 24,
               backgroundImage:
                   user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
-              child: user?.photoURL == null ? const Icon(Icons.person) : null,
+              child: user?.photoURL == null ? Icon(Icons.person, color: iconColor) : null,
             ),
-            title:
-                _isEditing
-                    ? TextField(
-                      controller: _usernameController,
-                      decoration: const InputDecoration(
-                        hintText: 'Enter new username',
-                        border: InputBorder.none,
-                      ),
-                    )
-                    : Text(
-                      user?.displayName ?? 'No username set',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
+            title: _isEditing
+                ? TextField(
+                    controller: _usernameController,
+                    decoration: InputDecoration(
+                      hintText: 'Enter new username',
+                      hintStyle: TextStyle(color: subtitleColor),
+                      border: InputBorder.none,
                     ),
-            subtitle: Text(user?.email ?? ''),
+                    style: TextStyle(color: textColor),
+                  )
+                : Text(
+                    user?.displayName ?? 'No username set',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: textColor,
+                    ),
+                  ),
+            subtitle: Text(
+              user?.email ?? '',
+              style: TextStyle(color: subtitleColor),
+            ),
             trailing: IconButton(
-              icon: Icon(_isEditing ? Icons.close : Icons.edit),
+              icon: Icon(
+                _isEditing ? Icons.close : Icons.edit,
+                color: iconColor,
+              ),
               onPressed: () {
                 setState(() {
                   _isEditing = !_isEditing;
@@ -109,15 +138,22 @@ class _SettingsPageState extends State<SettingsPage> {
               },
             ),
           ),
-          const Divider(height: 32),
-          const Text(
+          Divider(height: 32, color: dividerColor),
+          Text(
             'Display Mode',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Choose a display mode',
-            style: TextStyle(color: Colors.grey, fontSize: 14),
+            style: TextStyle(
+              color: subtitleColor,
+              fontSize: 14,
+            ),
           ),
           const SizedBox(height: 16),
           Row(
@@ -127,10 +163,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   context: context,
                   icon: Icons.nightlight_round,
                   label: 'Dark Mode',
-                  isSelected: themeProvider.isDarkMode,
-                  onTap: () {
-                    themeProvider.setThemeMode(ThemeMode.dark);
-                  },
+                  isSelected: isDarkMode,
+                  onTap: () => themeProvider.setThemeMode(ThemeMode.dark),
                 ),
               ),
               const SizedBox(width: 16),
@@ -139,24 +173,24 @@ class _SettingsPageState extends State<SettingsPage> {
                   context: context,
                   icon: Icons.wb_sunny,
                   label: 'Light Mode',
-                  isSelected: !themeProvider.isDarkMode,
-                  onTap: () {
-                    themeProvider.setThemeMode(ThemeMode.light);
-                  },
+                  isSelected: !isDarkMode,
+                  onTap: () => themeProvider.setThemeMode(ThemeMode.light),
                 ),
               ),
             ],
           ),
-          const Divider(height: 32),
+          Divider(height: 32, color: dividerColor),
           ListTile(
-            title: const Text('Log Out', style: TextStyle(color: Colors.red)),
+            title: Text(
+              'Log Out',
+              style: TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
             onTap: () async {
               try {
                 await FirebaseAuth.instance.signOut();
-
-                // 3. Reset app state (example using Provider)
-                // context.read<UserProvider>().clearUser();
-
                 Navigator.pushNamedAndRemoveUntil(
                   context,
                   '/signin',
@@ -182,26 +216,24 @@ class _SettingsPageState extends State<SettingsPage> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    final theme = Theme.of(context);
-    final isDarkTheme = theme.brightness == Brightness.dark;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDarkMode ? Colors.white : Colors.black;
 
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        backgroundColor:
-            isSelected
-                ? isDarkTheme
-                    ? Colors
-                        .grey[800] // Darker background for dark mode selection
-                    : Colors
-                        .blue[50] // Lighter background for light mode selection
-                : theme.cardColor,
-        foregroundColor:
-            isSelected ? theme.primaryColor : theme.textTheme.bodyLarge?.color,
+        backgroundColor: isSelected
+            ? (isDarkMode ? Colors.grey[800]! : Colors.blue[50]!)
+            : (isDarkMode ? Colors.grey[900]! : Colors.white),
+        foregroundColor: isSelected
+            ? Theme.of(context).primaryColor
+            : textColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
           side: BorderSide(
-            color: isSelected ? theme.primaryColor : theme.dividerColor,
+            color: isSelected
+                ? Theme.of(context).primaryColor
+                : (isDarkMode ? Colors.grey[700]! : Colors.grey[300]!),
             width: isSelected ? 1.5 : 1,
           ),
         ),
@@ -214,18 +246,16 @@ class _SettingsPageState extends State<SettingsPage> {
           Icon(
             icon,
             size: 20,
-            color:
-                isSelected
-                    ? theme.primaryColor
-                    : isDarkTheme
-                    ? Colors.grey[300]
-                    : Colors.grey[700],
+            color: isSelected
+                ? Theme.of(context).primaryColor
+                : (isDarkMode ? Colors.grey[300]! : Colors.grey[700]!),
           ),
           const SizedBox(width: 8),
           Text(
             label,
             style: TextStyle(
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              color: isSelected ? Theme.of(context).primaryColor : textColor,
             ),
           ),
         ],
@@ -233,17 +263,18 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  BottomNavigationBar _buildBottomNavBar(
-    BuildContext context,
-    int currentIndex,
-  ) {
+  BottomNavigationBar _buildBottomNavBar(BuildContext context, int currentIndex) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDarkMode ? Colors.grey[900] : Colors.white;
+
     return BottomNavigationBar(
       currentIndex: currentIndex,
       type: BottomNavigationBarType.fixed,
       selectedItemColor: Colors.blue,
-      unselectedItemColor: Colors.grey,
+      unselectedItemColor: isDarkMode ? Colors.grey[400] : Colors.grey[600],
       selectedLabelStyle: const TextStyle(fontSize: 12),
       unselectedLabelStyle: const TextStyle(fontSize: 12),
+      backgroundColor: backgroundColor,
       onTap: (index) {
         switch (index) {
           case 0:
