@@ -8,8 +8,6 @@ import 'package:camera/camera.dart';
 import 'dart:io';
 import 'dart:async';
 import '../services/google_drive_service.dart';
-import 'notification_service.dart';
-import 'package:intl/intl.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -20,13 +18,11 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   late final GoogleDriveService _driveService;
-  bool _isDriveServiceInitialized = false;
   User? _currentUser;
   File? _profileImage;
   bool _isUploading = false;
   late List<CameraDescription> _cameras;
   StreamSubscription<User?>? _authSubscription;
-  final String _googleDriveFolderId = '1i6JfYzdY5nMtZEhdk4o0qBzIsmN9DrMP';
 
   @override
   void initState() {
@@ -40,13 +36,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _initializeServices() async {
     try {
       _cameras = await availableCameras();
-      await _driveService.initialize(folderId: _googleDriveFolderId);
-
-      if (mounted) {
-        setState(() {
-          _isDriveServiceInitialized = true;
-        });
-      }
+      await _driveService.initialize();
     } on CameraException catch (e) {
       _showErrorSnackbar('Camera Error: ${e.description}');
     } catch (e) {
@@ -54,45 +44,52 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
   Future<void> _showImageSourceDialog() async {
     return showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Profile Picture'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Take Photo'),
-              onTap: () {
-                Navigator.pop(context);
-                _openCamera();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from Gallery'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage();
-              },
-            ),
-            if (_profileImage != null)
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text(
-                  'Remove Photo',
-                  style: TextStyle(color: Colors.red),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Edit Profile Picture'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.camera_alt),
+                  title: const Text('Take Photo'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openCamera();
+                  },
                 ),
-                onTap: () {
-                  Navigator.pop(context);
-                  _deleteProfileImage();
-                },
-              ),
-          ],
-        ),
-      ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library),
+                  title: const Text('Choose from Gallery'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage();
+                  },
+                ),
+                if (_profileImage != null)
+                  ListTile(
+                    leading: const Icon(Icons.delete, color: Colors.red),
+                    title: const Text(
+                      'Remove Photo',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _deleteProfileImage();
+                    },
+                  ),
+              ],
+            ),
+          ),
     );
   }
 
@@ -105,16 +102,19 @@ class _ProfilePageState extends State<ProfilePage> {
     final imageFile = await Navigator.push<File>(
       context,
       MaterialPageRoute(
-        builder: (context) => CameraPage(
-          cameras: _cameras,
-          onImageCaptured: (File imageFile) => imageFile,
-        ),
+        builder:
+            (context) => CameraPage(
+              cameras: _cameras,
+              onImageCaptured: (File imageFile) {
+                return imageFile;
+              },
+            ),
       ),
     );
 
     if (imageFile != null && mounted) {
       await _uploadAndSetProfileImage(imageFile);
-    }
+    } else {}
   }
 
   Future<void> _uploadAndSetProfileImage(File imageFile) async {
@@ -126,22 +126,18 @@ class _ProfilePageState extends State<ProfilePage> {
       final userId = _currentUser?.uid;
       if (userId == null) throw Exception('User not logged in');
 
-      final existingFileId = await _driveService.findUserProfileImage(userId);
-      if (existingFileId != null) {
-        final success = await _driveService.deleteProfileImage(existingFileId);
-        if (!success) throw Exception('Failed to delete existing image');
-      }
+      // The service automatically handles existing file deletion
+      final imageUrl = await _driveService.uploadProfileImage(
+        imageFile,
+        userId,
+      );
 
-      final imageUrl = await _driveService.uploadProfileImage(imageFile, userId);
-      if (imageUrl == null) throw Exception('Upload failed');
-
+      // Update Firebase user
       await _currentUser?.updatePhotoURL(imageUrl);
       await _refreshUser();
 
       if (mounted) {
-        setState(() {
-          _profileImage = imageFile;
-        });
+        setState(() => _profileImage = imageFile);
       }
     } catch (e) {
       if (mounted) {
@@ -162,19 +158,17 @@ class _ProfilePageState extends State<ProfilePage> {
       final userId = _currentUser?.uid;
       if (userId == null) throw Exception('User not logged in');
 
-      final fileId = await _driveService.findUserProfileImage(userId);
-      if (fileId != null) {
-        final success = await _driveService.deleteProfileImage(fileId);
-        if (!success) throw Exception('Failed to delete from Drive');
+      final success = await _driveService.deleteProfileImage(userId);
+
+      if (!success) {
+        throw Exception('Failed to remove profile picture');
       }
 
       await _currentUser?.updatePhotoURL(null);
       await _refreshUser();
 
       if (mounted) {
-        setState(() {
-          _profileImage = null;
-        });
+        setState(() => _profileImage = null);
       }
     } catch (e) {
       if (mounted) {
@@ -235,7 +229,9 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _showErrorSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _loadUser() {
@@ -245,85 +241,28 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _setupAuthListener() {
-    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((User? user) {
+    FirebaseAuth.instance.authStateChanges().listen((User? user) {
       if (mounted) {
-        setState(() => _currentUser = user);
+        setState(() => _currentUser = user); // Update if auth state changes
       }
     });
   }
 
   Future<void> _refreshUser() async {
     try {
-      await FirebaseAuth.instance.currentUser?.reload();
-      _loadUser();
+      await FirebaseAuth.instance.currentUser
+          ?.reload(); // Force Firebase refresh
+      _loadUser(); // Update UI
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error refreshing: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error refreshing: $e')));
     }
-  }
-
-  Widget _buildBidHistoryItem(Map<String, dynamic> bid) {
-    Color statusColor;
-    IconData statusIcon;
-    
-    switch (bid['status']) {
-      case 'Won':
-        statusColor = Colors.green;
-        statusIcon = Icons.check_circle;
-        break;
-      case 'Winning':
-        statusColor = Colors.blue;
-        statusIcon = Icons.arrow_upward;
-        break;
-      case 'Outbid':
-        statusColor = Colors.orange;
-        statusIcon = Icons.arrow_downward;
-        break;
-      default:
-        statusColor = Colors.grey;
-        statusIcon = Icons.hourglass_empty;
-    }
-
-    return Column(
-      children: [
-        ListTile(
-          leading: const Icon(Icons.gavel),
-          title: Text('Bid \$${bid['amount'].toStringAsFixed(2)} on ${bid['productName']}'),
-          subtitle: Text(bid['date']),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(statusIcon, color: statusColor, size: 20),
-              const SizedBox(width: 4),
-              Text(
-                bid['status'],
-                style: TextStyle(color: statusColor),
-              ),
-            ],
-          ),
-        ),
-        const Divider(),
-      ],
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    final biddingHistory = NotificationService.notifications
-        .where((n) => n['category'] == 'Auction')
-        .map((n) => {
-              'productName': n['title'].contains('on ') 
-                  ? n['title'].split('on ')[1] 
-                  : 'Unknown Product',
-              'amount': n['message'].contains('\$') 
-                  ? double.tryParse(n['message'].split('\$')[1].split(' ')[0]) ?? 0.0
-                  : 0.0,
-              'date': DateFormat('MMM d, y').format(n['timestamp']),
-              'status': n['title'].contains('Won') ? 'Won' : 'Winning',
-            })
-        .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -353,14 +292,25 @@ class _ProfilePageState extends State<ProfilePage> {
                     children: [
                       CircleAvatar(
                         radius: 40,
-                        backgroundImage: _profileImage != null
-                            ? FileImage(_profileImage!)
-                            : _currentUser?.photoURL != null
-                                ? NetworkImage(_currentUser!.photoURL!)
+                        backgroundImage:
+                            _profileImage != null
+                                ? FileImage(
+                                  _profileImage!,
+                                ) // Show local image if just uploaded
+                                : _currentUser?.photoURL != null
+                                ? NetworkImage(
+                                  _currentUser!.photoURL!,
+                                ) // Show from Firebase
                                 : null,
-                        child: _profileImage == null && _currentUser?.photoURL == null
-                            ? const Icon(Icons.person, size: 40, color: Colors.white)
-                            : null,
+                        child:
+                            _profileImage == null &&
+                                    _currentUser?.photoURL == null
+                                ? const Icon(
+                                  Icons.person,
+                                  size: 40,
+                                  color: Colors.white,
+                                )
+                                : null,
                       ),
                       if (!_isUploading)
                         Positioned(
@@ -385,7 +335,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 16),
                 Text(
                   user?.displayName ?? user?.email ?? 'Guest User',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -422,48 +372,38 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.star, color: Colors.amber, size: 20),
-                    SizedBox(width: 4),
-                    Text(
+                  children: [
+                    const Icon(Icons.star, color: Colors.amber, size: 20),
+                    const SizedBox(width: 4),
+                    const Text(
                       '4.5',
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
-                    SizedBox(width: 4),
-                    Text('(5 reviews)'),
+                    const SizedBox(width: 4),
+                    const Text('(5 reviews)'),
                   ],
                 ),
-                
-                if (biddingHistory.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Bidding History',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 16),
-                  ...biddingHistory.map((bid) => _buildBidHistoryItem(bid)).toList(),
-                ] else ...[
-                  const SizedBox(height: 24),
-                  const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Column(
-                      children: [
-                        Icon(Icons.gavel, size: 40, color: Colors.grey),
-                        SizedBox(height: 16),
-                        Text(
-                          'No bidding history yet',
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Participate in auctions to see your bidding activity here',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                const SizedBox(height: 24),
+                const Text(
+                  'Bidding history',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.gavel),
+                  title: const Text('Placed a bid of \$150 on Takashi'),
+                  subtitle: const Text('Apr 21, 2023'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {},
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.gavel),
+                  title: const Text('Placed a bid of \$100 on Kaws, Open'),
+                  subtitle: const Text('Apr 20, 2023'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {},
+                ),
               ],
             ),
           ),
@@ -474,7 +414,10 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  BottomNavigationBar _buildBottomNavBar(BuildContext context, int currentIndex) {
+  BottomNavigationBar _buildBottomNavBar(
+    BuildContext context,
+    int currentIndex,
+  ) {
     return BottomNavigationBar(
       currentIndex: currentIndex,
       type: BottomNavigationBarType.fixed,
@@ -486,7 +429,10 @@ class _ProfilePageState extends State<ProfilePage> {
         switch (index) {
           case 0:
             Navigator.pushNamedAndRemoveUntil(
-              context, '/home', (route) => false);
+              context,
+              '/home',
+              (route) => false,
+            );
             break;
           case 1:
             Navigator.pushNamed(context, '/categories');
@@ -547,13 +493,15 @@ class _CameraPageState extends State<CameraPage> {
   @override
   void initState() {
     super.initState();
-    _initializeCamera(0);
+    _initializeCamera(0); // Start with first camera
   }
 
   Future<void> _initializeCamera(int index) async {
     if (!mounted || index >= widget.cameras.length) return;
 
     setState(() => _isInitializing = true);
+
+    // Dispose previous controller if exists
     await _controller?.dispose();
 
     try {
@@ -588,20 +536,26 @@ class _CameraPageState extends State<CameraPage> {
   }
 
   Future<void> _takePicture() async {
-    if (_isInitializing || _controller == null || !_controller!.value.isInitialized) {
+    if (_isInitializing ||
+        _controller == null ||
+        !_controller!.value.isInitialized) {
       return;
     }
 
     try {
       final image = await _controller!.takePicture();
-      if (!mounted) return;
+
+      if (!mounted) {
+        return;
+      }
+
       widget.onImageCaptured(File(image.path));
       Navigator.pop(context, File(image.path));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to take picture')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Failed to take picture')));
       }
     }
   }
@@ -625,29 +579,30 @@ class _CameraPageState extends State<CameraPage> {
             ),
         ],
       ),
-      body: _isInitializing
-          ? const Center(child: CircularProgressIndicator())
-          : _controller != null && _controller!.value.isInitialized
+      body:
+          _isInitializing
+              ? const Center(child: CircularProgressIndicator())
+              : _controller != null && _controller!.value.isInitialized
               ? Stack(
-                  children: [
-                    CameraPreview(_controller!),
-                    Positioned(
-                      bottom: 24,
-                      left: 0,
-                      right: 0,
-                      child: Center(
-                        child: FloatingActionButton(
-                          backgroundColor: Colors.white,
-                          onPressed: _takePicture,
-                          child: const Icon(
-                            Icons.camera_alt,
-                            color: Colors.black,
-                          ),
+                children: [
+                  CameraPreview(_controller!),
+                  Positioned(
+                    bottom: 24,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: FloatingActionButton(
+                        backgroundColor: Colors.white,
+                        onPressed: _takePicture,
+                        child: const Icon(
+                          Icons.camera_alt,
+                          color: Colors.black,
                         ),
                       ),
                     ),
-                  ],
-                )
+                  ),
+                ],
+              )
               : const Center(child: Text('Camera unavailable')),
     );
   }
