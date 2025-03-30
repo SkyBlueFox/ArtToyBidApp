@@ -158,6 +158,12 @@ class _VerifyIdentityPageState extends State<VerifyIdentityPage> {
           'Verify Payment Method',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushReplacementNamed(context, '/singin');
+          },
+        ),
         centerTitle: true,
       ),
       body: Padding(

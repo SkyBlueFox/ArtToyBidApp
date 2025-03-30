@@ -81,6 +81,7 @@ class ProductService {
     try {
       await _productsCollection.doc(productId).update({
         'description': newDescription.trim(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
     } on FirebaseException catch (e) {
       throw _ProductException(
@@ -147,6 +148,7 @@ class ProductService {
         transaction.update(productRef, {
           'currentBid': newBid,
           'currentBidderId': bidderId,
+          'updatedAt': FieldValue.serverTimestamp(),
         });
       });
     } on FirebaseException catch (e) {
@@ -169,6 +171,7 @@ class ProductService {
       for (var doc in querySnapshot.docs) {
         batch.update(doc.reference, {
           'status': 'inactive',
+          'updatedAt': FieldValue.serverTimestamp(),
         });
       }
 
