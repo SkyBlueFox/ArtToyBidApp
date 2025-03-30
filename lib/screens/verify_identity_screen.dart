@@ -161,7 +161,7 @@ class _VerifyIdentityPageState extends State<VerifyIdentityPage> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            Navigator.pushReplacementNamed(context, '/singin');
+            Navigator.pushReplacementNamed(context, '/signin');
           },
         ),
         centerTitle: true,
