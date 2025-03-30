@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProductService {
-  final CollectionReference _productsCollection = 
-      FirebaseFirestore.instance.collection('products');
+  final CollectionReference _productsCollection = FirebaseFirestore.instance
+      .collection('products');
 
   Future<void> createProduct({
     required String name,
@@ -24,6 +24,7 @@ class ProductService {
         'price': price,
         'startBid': startBid,
         'currentBid': startBid,
+        'currentBidderId': null,
         'endTime': endTime,
         'type': type,
         'sellType': sellType,
@@ -37,6 +38,8 @@ class ProductService {
         code: e.code,
         message: 'Create failed: ${e.message}',
       );
+    } catch (e) {
+      throw _ProductException(code: 'UNKNOWN', message: 'An error occurred');
     }
   }
 
@@ -71,16 +74,109 @@ class ProductService {
         .snapshots();
   }
 
-  Future<void> updateProductDescription(String productId, String newDescription) async {
+  Future<void> updateProductDescription(
+    String productId,
+    String newDescription,
+  ) async {
     try {
       await _productsCollection.doc(productId).update({
         'description': newDescription.trim(),
-        'updatedAt': FieldValue.serverTimestamp(),
       });
     } on FirebaseException catch (e) {
       throw _ProductException(
         code: e.code,
         message: 'Update failed: ${e.message}',
+      );
+    }
+  }
+
+  Future<void> updateBid({
+    required String productId,
+    required double newBid,
+    required String bidderId,
+  }) async {
+    try {
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final productRef = _productsCollection.doc(productId);
+        final snapshot = await transaction.get(productRef);
+
+        if (!snapshot.exists) {
+          throw _ProductException(
+            code: 'not-found',
+            message: 'Product not found',
+          );
+        }
+
+        final data = snapshot.data() as Map<String, dynamic>;
+
+        // Validate product type
+        if (data['sellType'] != 'auction') {
+          throw _ProductException(
+            code: 'invalid-type',
+            message: 'Bidding only allowed for auction products',
+          );
+        }
+
+        // Check product status
+        if (data['status'] != 'active') {
+          throw _ProductException(
+            code: 'inactive',
+            message: 'Auction is not active',
+          );
+        }
+
+        // Check auction end time
+        final endTime = (data['endTime'] as Timestamp).toDate();
+        if (DateTime.now().isAfter(endTime)) {
+          throw _ProductException(
+            code: 'expired',
+            message: 'Auction has already ended',
+          );
+        }
+
+        // Validate bid amount
+        final currentBid = data['currentBid'] as double;
+        if (newBid <= currentBid) {
+          throw _ProductException(
+            code: 'low-bid',
+            message: 'Bid must be higher than current bid of \$$currentBid',
+          );
+        }
+
+        // Update the bid
+        transaction.update(productRef, {
+          'currentBid': newBid,
+          'currentBidderId': bidderId,
+        });
+      });
+    } on FirebaseException catch (e) {
+      throw _ProductException(
+        code: e.code,
+        message: 'Bid update failed: ${e.message}',
+      );
+    }
+  }
+
+  Future<void> updateExpiredProductsStatus() async {
+    try {
+      final now = Timestamp.fromDate(DateTime.now());
+      final querySnapshot = await _productsCollection
+          .where('status', isEqualTo: 'active')
+          .where('endTime', isLessThan: now)
+          .get();
+
+      final batch = FirebaseFirestore.instance.batch();
+      for (var doc in querySnapshot.docs) {
+        batch.update(doc.reference, {
+          'status': 'inactive',
+        });
+      }
+
+      await batch.commit();
+    } on FirebaseException catch (e) {
+      throw _ProductException(
+        code: e.code,
+        message: 'Status update failed: ${e.message}',
       );
     }
   }
