@@ -1,47 +1,45 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProductService {
-  final CollectionReference _productsCollection = FirebaseFirestore.instance
-      .collection('products');
+  final CollectionReference _productsCollection = 
+      FirebaseFirestore.instance.collection('products');
 
-  // Create a new product
   Future<void> createProduct({
     required String name,
+    required String description,
     required double price,
     required double startBid,
     required DateTime endTime,
-    required String category, // More descriptive than 'type'
-    required String sellType, // 'auction' or 'fixed-price'
-    required String sellerId, // Essential for product ownership
+    required String type,
+    required String sellType,
+    required String image,
+    required String sellerId,
   }) async {
     try {
       final docRef = _productsCollection.doc();
-
       await docRef.set({
-        'productId': docRef.id, // Store document ID as a field
+        'productId': docRef.id,
         'name': name.trim(),
+        'description': description.trim(),
         'price': price,
         'startBid': startBid,
-        'currentBid': startBid, // Initialize with start bid
+        'currentBid': startBid,
         'endTime': endTime,
-        'category': category,
+        'type': type,
         'sellType': sellType,
-        'imageUrl': "${docRef.id}.jpg",
+        'image': image,
         'sellerId': sellerId,
         'createdAt': FieldValue.serverTimestamp(),
-        'status': 'active', // Track product state
+        'status': 'active',
       });
     } on FirebaseException catch (e) {
       throw _ProductException(
         code: e.code,
         message: 'Create failed: ${e.message}',
       );
-    } catch (e) {
-      throw _ProductException(code: 'UNKNOWN', message: 'An error occurred');
     }
   }
 
-  // Get single product by ID
   Future<DocumentSnapshot> getProduct(String productId) async {
     try {
       return await _productsCollection.doc(productId).get();
@@ -53,23 +51,41 @@ class ProductService {
     }
   }
 
-  // Get all products stream (real-time updates)
   Stream<QuerySnapshot> getAllProducts() {
     return _productsCollection
         .orderBy('createdAt', descending: true)
         .snapshots();
   }
 
-  // Get products by category
-  Stream<QuerySnapshot> getProductsByCategory(String category) {
+  Stream<QuerySnapshot> getProductsBySellType(String sellType) {
     return _productsCollection
-        .where('category', isEqualTo: category.toLowerCase())
+        .where('sellType', isEqualTo: sellType)
         .orderBy('createdAt', descending: true)
         .snapshots();
   }
+
+  Stream<QuerySnapshot> getProductsByType(String type) {
+    return _productsCollection
+        .where('type', isEqualTo: type)
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  Future<void> updateProductDescription(String productId, String newDescription) async {
+    try {
+      await _productsCollection.doc(productId).update({
+        'description': newDescription.trim(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } on FirebaseException catch (e) {
+      throw _ProductException(
+        code: e.code,
+        message: 'Update failed: ${e.message}',
+      );
+    }
+  }
 }
 
-// Custom exception class
 class _ProductException implements Exception {
   final String code;
   final String message;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../providers/theme_provider.dart';
 import 'product_detail_screen.dart';
 import 'watchlist_service.dart';
@@ -31,40 +32,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
     'Supreme'
   ];
 
-  final List<Map<String, dynamic>> _popularItems = [
-    {
-      'name': 'Supreme x Kaws Chum',
-      'price': 4000.0,
-      'description': 'Limited edition collaboration figure',
-      'image': 'assets/images/kaws_chum.jpg',
-      'type': 'Auction',
-      'category': 'Kaws',
-    },
-    {
-      'name': 'Bearbrick 400% Medicom',
-      'price': 2500.0,
-      'description': 'Collectible designer toy',
-      'image': 'assets/images/bearbrick.jpg',
-      'type': 'Buy Now',
-      'category': 'Bearbrick',
-    },
-    {
-      'name': 'KAWS Companion',
-      'price': 2800.0,
-      'description': 'Classic KAWS Companion figure',
-      'image': 'assets/images/kaws_companion.jpg',
-      'type': 'Auction',
-      'category': 'Kaws',
-    },
-    {
-      'name': 'Funko Pop! Batman',
-      'price': 50.0,
-      'description': 'Limited edition Batman collectible',
-      'image': 'assets/images/funko_batman.jpg',
-      'type': 'Buy Now',
-      'category': 'Funko',
-    },
-  ];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   void _navigateToFilteredProducts(String filterType, String? category) {
     Navigator.push(
@@ -73,18 +41,9 @@ class _CategoriesPageState extends State<CategoriesPage> {
         builder: (context) => FilteredProductsPage(
           filterType: filterType,
           category: category,
-          products: _getFilteredProducts(filterType, category),
         ),
       ),
     );
-  }
-
-  List<Map<String, dynamic>> _getFilteredProducts(String filterType, String? category) {
-    return _popularItems.where((item) {
-      final matchesFilter = filterType == 'All' || item['type'] == filterType;
-      final matchesCategory = category == null || item['category'] == category;
-      return matchesFilter && matchesCategory;
-    }).toList();
   }
 
   double _parsePrice(dynamic value) {
@@ -166,10 +125,12 @@ class _CategoriesPageState extends State<CategoriesPage> {
     );
   }
 
-  Widget _buildProductCard(Map<String, dynamic> product, BuildContext context) {
+  Widget _buildProductCard(DocumentSnapshot doc, BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
-    final price = _parsePrice(product['price']);
+    final product = doc.data() as Map<String, dynamic>;
+    final price = _parsePrice(product['price'] ?? product['startBid']);
+    final productId = doc.id;
 
     return GestureDetector(
       onTap: () {
@@ -177,11 +138,10 @@ class _CategoriesPageState extends State<CategoriesPage> {
           context,
           MaterialPageRoute(
             builder: (context) => ProductDetailPage(
-              product: product,
+              productId: productId,
               onWatchlistChanged: () {
                 setState(() {});
               },
-              productName: product['name'],
             ),
           ),
         );
@@ -199,10 +159,12 @@ class _CategoriesPageState extends State<CategoriesPage> {
                   color: Colors.grey.shade200,
                   child: Center(
                     child: product['image'] != null
-                        ? Image.asset(
+                        ? Image.network(
                             product['image'],
                             fit: BoxFit.cover,
                             width: double.infinity,
+                            errorBuilder: (context, error, stackTrace) => 
+                              const Icon(Icons.broken_image),
                           )
                         : Icon(
                             Icons.image,
@@ -215,7 +177,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              product['name'],
+              product['name']?.toString() ?? 'Unknown Product',
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 color: textColor,
@@ -238,42 +200,53 @@ class _CategoriesPageState extends State<CategoriesPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: _getTypeColor(product['type']),
+                    color: _getTypeColor(product['sellType'] ?? 'Buy Now'),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    product['type'],
+                    product['sellType'] ?? 'Buy Now',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 10,
                     ),
                   ),
                 ),
-                IconButton(
-                  icon: Icon(
-                    WatchlistService.isInWatchlist(product['name'])
-                        ? Icons.favorite
-                        : Icons.favorite_border,
-                    color: Colors.red,
-                    size: 20,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      if (WatchlistService.isInWatchlist(product['name'])) {
-                        WatchlistService.removeFromWatchlist(product['name']);
-                      } else {
-                        WatchlistService.addToWatchlist(product);
-                      }
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          WatchlistService.isInWatchlist(product['name'])
-                              ? 'Added to watchlist'
-                              : 'Removed from watchlist',
-                        ),
-                        duration: const Duration(seconds: 1),
+                FutureBuilder<bool>(
+                  future: WatchlistService.isInWatchlist(productId),
+                  builder: (context, snapshot) {
+                    final isInWatchlist = snapshot.data ?? false;
+                    return IconButton(
+                      icon: Icon(
+                        isInWatchlist ? Icons.favorite : Icons.favorite_border,
+                        color: Colors.red,
+                        size: 20,
                       ),
+                      onPressed: () async {
+                        try {
+                          if (isInWatchlist) {
+                            await WatchlistService.removeFromWatchlist(productId);
+                          } else {
+                            await WatchlistService.addToWatchlist(productId, product);
+                          }
+                          setState(() {});
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                isInWatchlist
+                                    ? 'Removed from watchlist'
+                                    : 'Added to watchlist',
+                              ),
+                              duration: const Duration(seconds: 1),
+                            ),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: $e'),
+                            ),
+                          );
+                        }
+                      },
                     );
                   },
                 ),
@@ -287,8 +260,12 @@ class _CategoriesPageState extends State<CategoriesPage> {
 
   BottomNavigationBar _buildBottomNavBar(BuildContext context, int currentIndex) {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900] : Colors.white;
-    final iconColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+    final backgroundColor = themeProvider.isDarkMode 
+        ? Colors.grey[900]! 
+        : Colors.white;
+    final iconColor = themeProvider.isDarkMode 
+        ? Colors.white 
+        : Colors.black;
 
     return BottomNavigationBar(
       currentIndex: currentIndex,
@@ -305,7 +282,6 @@ class _CategoriesPageState extends State<CategoriesPage> {
                 context, '/home', (route) => false);
             break;
           case 1:
-            // Already on categories screen
             break;
           case 2:
             Navigator.pushNamed(context, '/watchlist');
@@ -344,7 +320,9 @@ class _CategoriesPageState extends State<CategoriesPage> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
-    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900] : Colors.white;
+    final backgroundColor = themeProvider.isDarkMode 
+        ? Colors.grey[900]! 
+        : Colors.white;
 
     return Scaffold(
       appBar: AppBar(
@@ -431,11 +409,29 @@ class _CategoriesPageState extends State<CategoriesPage> {
             const SizedBox(height: 16),
             SizedBox(
               height: 220,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: _popularItems.length,
-                itemBuilder: (context, index) {
-                  return _buildProductCard(_popularItems[index], context);
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _firestore.collection('products')
+                    .orderBy('updatedAt', descending: true)
+                    .limit(4)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  }
+
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final products = snapshot.data?.docs ?? [];
+
+                  return ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: products.length,
+                    itemBuilder: (context, index) {
+                      return _buildProductCard(products[index], context);
+                    },
+                  );
                 },
               ),
             ),

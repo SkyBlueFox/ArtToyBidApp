@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:bid/providers/theme_provider.dart';
 import 'package:bid/screens/product_detail_screen.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  HomePage({super.key});
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   Widget build(BuildContext context) {
@@ -13,29 +15,6 @@ class HomePage extends StatelessWidget {
     final textColor = isDarkMode ? Colors.white : Colors.black;
     final backgroundColor = isDarkMode ? Colors.grey[900] : Colors.white;
     final iconColor = isDarkMode ? Colors.white : Colors.black;
-
-    final List<Map<String, dynamic>> promotions = [
-      {
-        'title': 'Summer Collection',
-        'subtitle': 'Limited edition art toys',
-        'image': 'assets/images/promo1.jpg',
-        'product': {
-          'name': 'KAWS Summer Edition',
-          'price': 3200.0,
-          'description': 'Special summer colorway of the iconic KAWS figure',
-        }
-      },
-      {
-        'title': 'New Arrivals',
-        'subtitle': 'Fresh from the designers',
-        'image': 'assets/images/promo2.jpg',
-        'product': {
-          'name': 'Bearbrick New Wave',
-          'price': 2800.0,
-          'description': 'Latest series from Medicom Toy',
-        }
-      },
-    ];
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -72,7 +51,7 @@ class HomePage extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            _buildPromoBanner(context, promotions),
+            _buildPromoBanner(context),
             _buildSectionTitle('Recommendation', textColor),
             _buildRecommendationList(context),
             _buildSectionTitle('Popular Items', textColor),
@@ -84,75 +63,50 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildPromoBanner(BuildContext context, List<Map<String, dynamic>> promotions) {
-    return SizedBox(
-      height: 200,
-      child: PageView.builder(
-        itemCount: promotions.length,
-        itemBuilder: (context, index) {
-          final promo = promotions[index];
-          return GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ProductDetailPage(
-                    product: promo['product'], 
-                    productName: promo['product']['name'], 
-                    onWatchlistChanged: () {},
+  Widget _buildPromoBanner(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore.collection('promotions').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text('Error loading promotions', style: TextStyle(color: Colors.red)));
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 200,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final promotions = snapshot.data?.docs ?? [];
+
+        if (promotions.isEmpty) {
+          return const SizedBox(
+            height: 200,
+            child: Center(child: Text('No promotions available')),
+          );
+        }
+
+        return SizedBox(
+          height: 200,
+          child: PageView.builder(
+            itemCount: promotions.length,
+            itemBuilder: (context, index) {
+              final promo = promotions[index].data() as Map<String, dynamic>;
+              return Container(
+                margin: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  image: DecorationImage(
+                    image: NetworkImage(promo['imageUrl'] ?? ''),
+                    fit: BoxFit.cover,
                   ),
                 ),
               );
             },
-            child: Container(
-              margin: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                image: DecorationImage(
-                  image: AssetImage(promo['image'] ?? 'assets/images/default_promo.jpg'),
-                  fit: BoxFit.cover,
-                ),
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.7),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      promo['title'] ?? 'Promotion',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      promo['subtitle'] ?? 'Special offer',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -180,37 +134,59 @@ class HomePage extends StatelessWidget {
     final isDarkMode = themeProvider.isDarkMode;
     final cardColor = isDarkMode ? Colors.grey[800] : Colors.white;
 
-    final List<Map<String, dynamic>> recommendations = [
-      {
-        'name': 'Supreme x Kaws Chum',
-        'price': 4000.0,
-        'description': 'Limited edition collaboration figure',
-        'image': 'assets/images/kaws_chum.jpg',
-      },
-      {
-        'name': 'Bearbrick 400% Medicom',
-        'price': 2500.0,
-        'description': 'Collectible designer toy',
-        'image': 'assets/images/bearbrick.jpg',
-      },
-      {
-        'name': 'KAWS Companion',
-        'price': 2800.0,
-        'description': 'Classic KAWS Companion figure',
-        'image': 'assets/images/kaws_companion.jpg',
-      },
-    ];
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore.collection('products')
+          .where('sellType', isEqualTo: 'Auction')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Error loading recommendations',
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+            ),
+          );
+        }
 
-    return SizedBox(
-      height: 220,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        itemCount: recommendations.length,
-        itemBuilder: (context, index) {
-          return _buildProductCard(recommendations[index], context, cardColor);
-        },
-      ),
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 220,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final recommendations = snapshot.data?.docs ?? [];
+
+        if (recommendations.isEmpty) {
+          return SizedBox(
+            height: 220,
+            child: Center(
+              child: Text(
+                'No recommendations found',
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+              ),
+            ),
+          );
+        }
+
+        return SizedBox(
+          height: 220,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            itemCount: recommendations.length,
+            itemBuilder: (context, index) {
+              final product = recommendations[index].data() as Map<String, dynamic>;
+              return _buildProductCard(
+                product, 
+                context, 
+                cardColor,
+                recommendations[index].id,
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -219,44 +195,54 @@ class HomePage extends StatelessWidget {
     final isDarkMode = themeProvider.isDarkMode;
     final cardColor = isDarkMode ? Colors.grey[800] : Colors.white;
 
-    final List<Map<String, dynamic>> popularItems = [
-      {
-        'name': 'Kaws x Sesame Street',
-        'price': 3500.0,
-        'description': 'Exclusive collaboration with Sesame Street',
-        'image': 'assets/images/kaws_sesame.jpg',
-      },
-      {
-        'name': 'Funko Pop! Batman',
-        'price': 50.0,
-        'description': 'Limited edition Batman collectible',
-        'image': 'assets/images/funko_batman.jpg',
-      },
-      {
-        'name': 'Dunny Series',
-        'price': 120.0,
-        'description': 'Artist series collectible figures',
-        'image': 'assets/images/dunny.jpg',
-      },
-      {
-        'name': 'Supreme Box Logo',
-        'price': 300.0,
-        'description': 'Iconic Supreme box logo tee',
-        'image': 'assets/images/supreme_tee.jpg',
-      },
-    ];
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore.collection('products').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Error loading popular items',
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+            ),
+          );
+        }
 
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      childAspectRatio: 0.8,
-      padding: const EdgeInsets.all(8),
-      children: popularItems.map((item) => _buildProductCard(item, context, cardColor)).toList(),
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final popularItems = snapshot.data?.docs ?? [];
+
+        if (popularItems.isEmpty) {
+          return Center(
+            child: Text(
+              'No products found',
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+            ),
+          );
+        }
+
+        return GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          childAspectRatio: 0.8,
+          padding: const EdgeInsets.all(8),
+          children: popularItems.map((doc) {
+            final product = doc.data() as Map<String, dynamic>;
+            return _buildProductCard(product, context, cardColor, doc.id);
+          }).toList(),
+        );
+      },
     );
   }
 
-  Widget _buildProductCard(Map<String, dynamic> product, BuildContext context, Color? cardColor) {
+  Widget _buildProductCard(
+    Map<String, dynamic> product, 
+    BuildContext context, 
+    Color? cardColor,
+    String productId,
+  ) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDarkMode = themeProvider.isDarkMode;
     final textColor = isDarkMode ? Colors.white : Colors.black;
@@ -267,8 +253,7 @@ class HomePage extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (context) => ProductDetailPage(
-              product: product,
-              productName: product['name'] ?? 'Unknown',
+              productId: productId,
               onWatchlistChanged: () {},
             ),
           ),
@@ -290,10 +275,22 @@ class HomePage extends StatelessWidget {
                   topRight: Radius.circular(12),
                 ),
                 child: product['image'] != null
-                    ? Image.asset(
+                    ? Image.network(
                         product['image']!,
                         fit: BoxFit.cover,
                         width: double.infinity,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.grey.shade200,
+                            child: Center(
+                              child: Icon(
+                                Icons.broken_image,
+                                size: 50,
+                                color: Colors.grey.shade400,
+                              ),
+                            ),
+                          );
+                        },
                       )
                     : Container(
                         color: Colors.grey.shade200,
@@ -330,6 +327,16 @@ class HomePage extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  if (product['sellType'] == 'Auction') ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Auction',
+                      style: TextStyle(
+                        color: Colors.orange,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -382,7 +389,7 @@ class HomePage extends StatelessWidget {
           label: 'Watchlist',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.person_outline),
+          icon: Icon(Icons.person_outlined),
           activeIcon: Icon(Icons.person),
           label: 'Account',
         ),

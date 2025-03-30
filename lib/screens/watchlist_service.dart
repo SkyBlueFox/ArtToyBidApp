@@ -1,38 +1,98 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 class WatchlistService {
-  static List<Map<String, dynamic>> _watchlistItems = [];
+  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  static List<Map<String, dynamic>> get watchlistItems => _watchlistItems;
+  static Stream<List<DocumentSnapshot>> getWatchlistStream() {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) {
+      return Stream.value([]);
+    }
 
-  static void addToWatchlist(Map<String, dynamic> product) {
-    // แก้ไขให้แปลงราคาก่อนบันทึก
-    final productToAdd = {
-      ...product,
-      'price': _parsePrice(product['price']),
-    };
-    
-    if (!_watchlistItems.any((item) => item['name'] == product['name'])) {
-      _watchlistItems.add(productToAdd);
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('watchlist')
+        .orderBy('addedAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs);
+  }
+
+  static Future<void> addToWatchlist(String productId, Map<String, dynamic> product) async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) throw Exception('User not logged in');
+
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('watchlist')
+          .doc(productId)
+          .set({
+            'productId': productId,
+            'addedAt': FieldValue.serverTimestamp(),
+            ...product,
+          });
+    } catch (e) {
+      throw Exception('Failed to add to watchlist: $e');
     }
   }
 
-  static void removeFromWatchlist(String productName) {
-    _watchlistItems.removeWhere((item) => item['name'] == productName);
+  static Future<void> removeFromWatchlist(String productId) async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) throw Exception('User not logged in');
+
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('watchlist')
+          .doc(productId)
+          .delete();
+    } catch (e) {
+      throw Exception('Failed to remove from watchlist: $e');
+    }
   }
 
-  static bool isInWatchlist(String productName) {
-    return _watchlistItems.any((item) => item['name'] == productName);
+  static Future<bool> isInWatchlist(String productId) async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) return false;
+
+      final doc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('watchlist')
+          .doc(productId)
+          .get();
+
+      return doc.exists;
+    } catch (e) {
+      return false;
+    }
   }
 
-  static void clearWatchlist() {
-    _watchlistItems.clear();
-  }
+  static Future<void> clearWatchlist() async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) throw Exception('User not logged in');
 
-  // เพิ่มเมธอดสำหรับแปลงราคา
-  static double _parsePrice(dynamic value) {
-    if (value == null) return 0.0;
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? 0.0;
-    return 0.0;
+      final batch = _firestore.batch();
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('watchlist')
+          .get();
+
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+
+      await batch.commit();
+    } catch (e) {
+      throw Exception('Failed to clear watchlist: $e');
+    }
   }
 }

@@ -1,4 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:bid/providers/theme_provider.dart';
 import 'product_detail_screen.dart';
 import 'watchlist_service.dart';
 
@@ -6,15 +9,21 @@ class WatchlistPage extends StatefulWidget {
   const WatchlistPage({super.key});
 
   @override
-  State<WatchlistPage> createState() => _WatchlistScreenState();
+  State<WatchlistPage> createState() => _WatchlistPageState();
 }
 
-class _WatchlistScreenState extends State<WatchlistPage> {
+class _WatchlistPageState extends State<WatchlistPage> {
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+    final backgroundColor = themeProvider.isDarkMode 
+        ? Colors.grey[900]! 
+        : Colors.white;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Center( // Centered title
+        title: const Center(
           child: Text(
             'Your Watchlist',
             style: TextStyle(
@@ -23,10 +32,35 @@ class _WatchlistScreenState extends State<WatchlistPage> {
             ),
           ),
         ),
-        centerTitle: true, // Ensure title is centered
+        centerTitle: true,
+        backgroundColor: backgroundColor,
+        iconTheme: IconThemeData(color: textColor),
       ),
-      body: WatchlistService.watchlistItems.isEmpty
-          ? Center(
+      backgroundColor: backgroundColor,
+      body: StreamBuilder<List<DocumentSnapshot>>(
+        stream: WatchlistService.getWatchlistStream(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                'Error loading watchlist',
+                style: TextStyle(color: textColor),
+              ),
+            );
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(
+              child: CircularProgressIndicator(
+                color: Theme.of(context).primaryColor,
+              ),
+            );
+          }
+
+          final watchlistItems = snapshot.data ?? [];
+
+          if (watchlistItems.isEmpty) {
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -36,7 +70,7 @@ class _WatchlistScreenState extends State<WatchlistPage> {
                     color: Colors.grey,
                   ),
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'No items in your watchlist',
                     style: TextStyle(
                       fontSize: 18,
@@ -53,22 +87,39 @@ class _WatchlistScreenState extends State<WatchlistPage> {
                   ),
                 ],
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: WatchlistService.watchlistItems.length,
-              itemBuilder: (context, index) {
-                final item = WatchlistService.watchlistItems[index];
-                return _buildWatchlistItem(item, context);
-              },
-            ),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: watchlistItems.length,
+            itemBuilder: (context, index) {
+              final item = watchlistItems[index];
+              final product = item.data() as Map<String, dynamic>;
+              return _buildWatchlistItem(item.id, product, context);
+            },
+          );
+        },
+      ),
       bottomNavigationBar: _buildBottomNavBar(context, 2),
     );
   }
 
-  Widget _buildWatchlistItem(Map<String, dynamic> item, BuildContext context) {
+  Widget _buildWatchlistItem(
+    String productId,
+    Map<String, dynamic> product, 
+    BuildContext context,
+  ) {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+    final cardColor = themeProvider.isDarkMode 
+        ? Colors.grey[800]! 
+        : Colors.white;
+    final price = _parsePrice(product['price']);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
+      color: cardColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
@@ -79,11 +130,10 @@ class _WatchlistScreenState extends State<WatchlistPage> {
             context,
             MaterialPageRoute(
               builder: (context) => ProductDetailPage(
-                product: item,
+                productId: productId,
                 onWatchlistChanged: () {
                   setState(() {});
                 },
-                productName: item['name'] ?? '',
               ),
             ),
           );
@@ -100,10 +150,12 @@ class _WatchlistScreenState extends State<WatchlistPage> {
                 ),
                 color: Colors.grey.shade200,
               ),
-              child: item['image'] != null
-                  ? Image.asset(
-                      item['image'],
+              child: product['imageUrl'] != null
+                  ? Image.network(
+                      product['imageUrl'],
                       fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => 
+                        Center(child: Icon(Icons.broken_image, size: 50)),
                     )
                   : Center(
                       child: Text(
@@ -120,15 +172,16 @@ class _WatchlistScreenState extends State<WatchlistPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item['name']?.toString() ?? 'No Name',
-                    style: const TextStyle(
+                    product['name'] ?? 'No Name',
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
+                      color: textColor,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '\$${(item['price'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+                    '\$${price.toStringAsFixed(2)}',
                     style: const TextStyle(
                       fontSize: 16,
                       color: Colors.blue,
@@ -137,7 +190,7 @@ class _WatchlistScreenState extends State<WatchlistPage> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    item['description']?.toString() ?? 'No description',
+                    product['description'] ?? 'No description',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade700,
@@ -152,10 +205,19 @@ class _WatchlistScreenState extends State<WatchlistPage> {
                           Icons.favorite,
                           color: Colors.red,
                         ),
-                        onPressed: () {
-                          setState(() {
-                            WatchlistService.removeFromWatchlist(item['name']?.toString() ?? '');
-                          });
+                        onPressed: () async {
+                          try {
+                            await WatchlistService.removeFromWatchlist(productId);
+                            if (mounted) setState(() {});
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Failed to remove: $e'),
+                                ),
+                              );
+                            }
+                          }
                         },
                       ),
                     ],
@@ -169,12 +231,29 @@ class _WatchlistScreenState extends State<WatchlistPage> {
     );
   }
 
+  double _parsePrice(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
   BottomNavigationBar _buildBottomNavBar(BuildContext context, int currentIndex) {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final backgroundColor = themeProvider.isDarkMode 
+        ? Colors.grey[900]! 
+        : Colors.white;
+    final iconColor = themeProvider.isDarkMode 
+        ? Colors.white 
+        : Colors.black;
+
     return BottomNavigationBar(
       currentIndex: currentIndex,
       type: BottomNavigationBarType.fixed,
       selectedItemColor: Colors.blue,
-      unselectedItemColor: Colors.grey,
+      unselectedItemColor: iconColor,
+      backgroundColor: backgroundColor,
       selectedLabelStyle: const TextStyle(fontSize: 12),
       unselectedLabelStyle: const TextStyle(fontSize: 12),
       onTap: (index) {

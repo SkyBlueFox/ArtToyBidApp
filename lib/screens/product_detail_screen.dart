@@ -1,22 +1,21 @@
-// product_detail_screen.dart
 import 'dart:async';
 import 'package:bid/screens/cart_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'watchlist_service.dart';
 import 'notification_service.dart';
 import 'cart_service.dart';
 
 class ProductDetailPage extends StatefulWidget {
-  final Map<String, dynamic> product;
+  final String productId;
   final VoidCallback onWatchlistChanged;
-  final String productName;
 
   const ProductDetailPage({
     super.key,
-    required this.product,
+    required this.productId,
     required this.onWatchlistChanged,
-    required this.productName,
   });
 
   @override
@@ -35,27 +34,51 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   bool isLeadingBidder = false;
   bool isInWatchlist = false;
   List<Map<String, dynamic>> biddingHistory = [];
-
-  double _parsePrice(dynamic value) {
-    if (value == null) return 0.0;
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? 0.0;
-    return 0.0;
-  }
+  Map<String, dynamic>? productData;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
     super.initState();
-    minimumBid = _parsePrice(widget.product['minimumBid']);
-    currentBid = _parsePrice(widget.product['currentBid']) ?? minimumBid;
-    buyNowPrice = _parsePrice(widget.product['buyNowPrice']);
-    isInWatchlist = WatchlistService.isInWatchlist(widget.productName);
+    _loadProductData();
+    _checkWatchlistStatus();
+  }
 
-    auctionEndTime = DateTime.now().add(const Duration(days: 3));
-    remainingTime = auctionEndTime.difference(DateTime.now());
-    
+  Future<void> _loadProductData() async {
+    try {
+      final doc = await _firestore.collection('products').doc(widget.productId).get();
+      if (doc.exists) {
+        setState(() {
+          productData = doc.data() as Map<String, dynamic>;
+          minimumBid = _parsePrice(productData?['startBid'] ?? 0);
+          currentBid = _parsePrice(productData?['currentBid'] ?? minimumBid);
+          buyNowPrice = _parsePrice(productData?['price'] ?? 0);
+          
+          final endTime = productData?['endTime'] as Timestamp?;
+          auctionEndTime = endTime?.toDate() ?? DateTime.now().add(const Duration(days: 3));
+          remainingTime = auctionEndTime.difference(DateTime.now());
+          
+          _startTimer();
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading product: $e')),
+      );
+    }
+  }
+
+  Future<void> _checkWatchlistStatus() async {
+    isInWatchlist = await WatchlistService.isInWatchlist(widget.productId);
+    if (mounted) setState(() {});
+  }
+
+  void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       setState(() {
         remainingTime = auctionEndTime.difference(DateTime.now());
         if (remainingTime.isNegative) {
@@ -76,10 +99,13 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   void _addWonAuctionToCart() {
+    if (productData == null) return;
+    
     final auctionItem = {
-      'name': widget.product['name'],
+      'productId': widget.productId,
+      'name': productData?['name'],
       'price': currentBid,
-      'image': widget.product['image'],
+      'imageUrl': productData?['imageUrl'],
       'isAuction': true,
       'quantity': 1,
       'status': 'Won',
@@ -89,23 +115,25 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${widget.product['name']} added to your cart!'),
+        content: Text('${productData?['name']} added to your cart!'),
         duration: const Duration(seconds: 2),
       ),
     );
   }
 
   void _notifyAuctionEnded() {
+    if (productData == null) return;
+    
     if (isLeadingBidder) {
       NotificationService.addNotification(
         title: 'Auction Won!',
-        message: 'You won the auction for ${widget.product['name']} with your bid of \$${currentBid.toStringAsFixed(2)}',
+        message: 'You won the auction for ${productData?['name']} with your bid of \$${currentBid.toStringAsFixed(2)}',
         category: 'Auction',
       );
     } else {
       NotificationService.addNotification(
         title: 'Auction Ended',
-        message: 'The auction for ${widget.product['name']} has ended',
+        message: 'The auction for ${productData?['name']} has ended',
         category: 'Auction',
       );
     }
@@ -118,28 +146,38 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     super.dispose();
   }
 
-  void _toggleWatchlist() {
-    setState(() {
-      isInWatchlist = !isInWatchlist;
+  Future<void> _toggleWatchlist() async {
+    try {
       if (isInWatchlist) {
-        WatchlistService.addToWatchlist(widget.product);
+        await WatchlistService.removeFromWatchlist(widget.productId);
       } else {
-        WatchlistService.removeFromWatchlist(widget.productName);
+        if (productData != null) {
+          await WatchlistService.addToWatchlist(widget.productId, productData!);
+        }
       }
-      widget.onWatchlistChanged();
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(isInWatchlist 
-          ? 'Added to watchlist' 
-          : 'Removed from watchlist'),
-        duration: const Duration(seconds: 1),
-      ),
-    );
+      if (mounted) {
+        setState(() {
+          isInWatchlist = !isInWatchlist;
+        });
+        widget.onWatchlistChanged();
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isInWatchlist ? 'Added to watchlist' : 'Removed from watchlist'),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating watchlist: $e')),
+      );
+    }
   }
 
-  void _placeBid() {
+  Future<void> _placeBid() async {
+    if (productData == null) return;
+    
     final bidAmount = double.tryParse(_bidController.text) ?? 0.0;
     
     if (bidAmount < minimumBid) {
@@ -160,37 +198,54 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       return;
     }
 
-    setState(() {
-      currentBid = bidAmount;
-      isLeadingBidder = true;
-      _bidController.clear();
-      
-      biddingHistory.add({
-        'productName': widget.product['name'],
-        'amount': bidAmount,
-        'date': DateFormat('MMM d, y').format(DateTime.now()),
-        'status': isAuctionEnded ? 'Won' : 'Winning',
+    try {
+      await _firestore.collection('products').doc(widget.productId).update({
+        'currentBid': bidAmount,
+        'lastBidder': FirebaseAuth.instance.currentUser?.uid,
+        'updatedAt': FieldValue.serverTimestamp(),
       });
-    });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Bid of \$${bidAmount.toStringAsFixed(2)} placed successfully!'),
-      ),
-    );
-    
-    NotificationService.addNotification(
-      title: 'Bid Placed',
-      message: 'You placed a bid of \$${bidAmount.toStringAsFixed(2)} on ${widget.product['name']}',
-      category: 'Auction',
-    );
+      if (mounted) {
+        setState(() {
+          currentBid = bidAmount;
+          isLeadingBidder = true;
+          _bidController.clear();
+          
+          biddingHistory.add({
+            'productId': widget.productId,
+            'amount': bidAmount,
+            'date': DateFormat('MMM d, y').format(DateTime.now()),
+            'status': isAuctionEnded ? 'Won' : 'Winning',
+          });
+        });
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Bid of \$${bidAmount.toStringAsFixed(2)} placed successfully!'),
+        ),
+      );
+      
+      NotificationService.addNotification(
+        title: 'Bid Placed',
+        message: 'You placed a bid of \$${bidAmount.toStringAsFixed(2)} on ${productData?['name']}',
+        category: 'Auction',
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to place bid: $e')),
+      );
+    }
   }
 
   void _buyNow() {
+    if (productData == null) return;
+    
     final productItem = {
-      'name': widget.product['name'],
+      'productId': widget.productId,
+      'name': productData?['name'],
       'price': buyNowPrice,
-      'image': widget.product['image'],
+      'imageUrl': productData?['imageUrl'],
       'isAuction': false,
       'quantity': 1,
     };
@@ -199,7 +254,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${widget.product['name']} (\$${buyNowPrice.toStringAsFixed(2)}) added to cart!'),
+        content: Text('${productData?['name']} (\$${buyNowPrice.toStringAsFixed(2)}) added to cart!'),
         duration: const Duration(seconds: 2),
         action: SnackBarAction(
           label: 'View Cart',
@@ -222,16 +277,30 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     final hours = twoDigits(duration.inHours.remainder(24));
     final minutes = twoDigits(duration.inMinutes.remainder(60));
     final seconds = twoDigits(duration.inSeconds.remainder(60));
-    return "$days    $hours    $minutes    $seconds";
+    return "$days:$hours:$minutes:$seconds";
+  }
+
+  double _parsePrice(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
   }
 
   @override
   Widget build(BuildContext context) {
+    if (productData == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final priceFormat = NumberFormat("#,##0.00", "en_US");
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.product['name'] ?? 'Product Details'),
+        title: Text(productData?['name'] ?? 'Product Details'),
         actions: [
           IconButton(
             icon: Icon(
@@ -240,7 +309,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             ),
             onPressed: _toggleWatchlist,
           ),
-          // Add Cart Icon with badge
           Stack(
             children: [
               IconButton(
@@ -291,10 +359,12 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               height: 300,
               color: Colors.grey.shade200,
               child: Center(
-                child: widget.product['image'] != null
-                    ? Image.asset(
-                        widget.product['image']!,
+                child: productData?['imageUrl'] != null
+                    ? Image.network(
+                        productData?['imageUrl']!,
                         fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => 
+                          const Icon(Icons.broken_image, size: 100),
                       )
                     : const Icon(Icons.image, size: 100),
               ),
@@ -302,7 +372,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             const SizedBox(height: 16),
             
             Text(
-              widget.product['name'] ?? 'Unknown Product',
+              productData?['name'] ?? 'Unknown Product',
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -318,7 +388,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   style: const TextStyle(fontSize: 18),
                 ),
                 const SizedBox(height: 8),
-
                 Text(
                   'Buy Now Price: \$${priceFormat.format(buyNowPrice)}',
                   style: const TextStyle(
@@ -331,11 +400,19 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             ),
             const SizedBox(height: 16),
             
-            Text(
-              widget.product['description'] ?? 'No description available',
-              style: const TextStyle(fontSize: 16),
-            ),
-            const SizedBox(height: 24),
+            // Improved description display
+            if (productData?['description'] != null && productData!['description'].toString().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  productData!['description'],
+                  style: const TextStyle(
+                    fontSize: 16,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            const SizedBox(height: 16),
             
             Card(
               child: Padding(
