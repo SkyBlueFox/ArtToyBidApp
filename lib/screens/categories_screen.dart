@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/theme_provider.dart';
 import 'product_detail_screen.dart';
 import 'watchlist_service.dart';
 import 'filtered_products_screen.dart';
@@ -85,103 +87,27 @@ class _CategoriesPageState extends State<CategoriesPage> {
     }).toList();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Categories',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Filter Chips
-            SizedBox(
-              height: 50,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: List.generate(_filters.length, (index) {
-                  return Padding(
-                    padding: EdgeInsets.only(
-                        left: index == 0 ? 0 : 8, 
-                        right: index == _filters.length - 1 ? 0 : 8),
-                    child: FilterChip(
-                      label: Text(_filters[index]),
-                      selected: _selectedFilterIndex == index,
-                      onSelected: (bool selected) {
-                        setState(() {
-                          _selectedFilterIndex = selected ? index : 0;
-                        });
-                        _navigateToFilteredProducts(_filters[index], null);
-                      },
-                      selectedColor: Colors.blue.withOpacity(0.2),
-                      checkmarkColor: Colors.blue,
-                      labelStyle: TextStyle(
-                        color: _selectedFilterIndex == index 
-                            ? Colors.blue 
-                            : Colors.black,
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            // Categories Grid
-            const Text(
-              'Categories',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              childAspectRatio: 1.2,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              children: _categories.map((category) {
-                return _buildCategoryItem(category, _getCategoryIcon(category));
-              }).toList(),
-            ),
-            
-            // Popular Items
-            const SizedBox(height: 24),
-            const Text(
-              'Popular in Categories',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 220,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: _popularItems.length,
-                itemBuilder: (context, index) {
-                  return _buildProductCard(_popularItems[index], context);
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: _buildBottomNavBar(context, 1),
-    );
+  double _parsePrice(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
+  Color _getTypeColor(String type) {
+    switch (type) {
+      case 'Auction':
+        return Colors.orange;
+      case 'Buy Now':
+        return Colors.green;
+      case 'Open Editions':
+        return Colors.purple;
+      case 'Sold':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
   }
 
   IconData _getCategoryIcon(String category) {
@@ -204,6 +130,9 @@ class _CategoriesPageState extends State<CategoriesPage> {
   }
 
   Widget _buildCategoryItem(String title, IconData icon) {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+    
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -225,9 +154,10 @@ class _CategoriesPageState extends State<CategoriesPage> {
             const SizedBox(height: 8),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
+                color: textColor,
               ),
             ),
           ],
@@ -237,6 +167,10 @@ class _CategoriesPageState extends State<CategoriesPage> {
   }
 
   Widget _buildProductCard(Map<String, dynamic> product, BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+    final price = _parsePrice(product['price']);
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -282,15 +216,16 @@ class _CategoriesPageState extends State<CategoriesPage> {
             const SizedBox(height: 8),
             Text(
               product['name'],
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w600,
+                color: textColor,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4),
             Text(
-              '\$${product['price'].toStringAsFixed(2)}',
+              '\$${price.toStringAsFixed(2)}',
               style: const TextStyle(
                 color: Colors.blue,
                 fontWeight: FontWeight.w700,
@@ -330,6 +265,16 @@ class _CategoriesPageState extends State<CategoriesPage> {
                         WatchlistService.addToWatchlist(product);
                       }
                     });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          WatchlistService.isInWatchlist(product['name'])
+                              ? 'Added to watchlist'
+                              : 'Removed from watchlist',
+                        ),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
                   },
                 ),
               ],
@@ -340,27 +285,17 @@ class _CategoriesPageState extends State<CategoriesPage> {
     );
   }
 
-  Color _getTypeColor(String type) {
-    switch (type) {
-      case 'Auction':
-        return Colors.orange;
-      case 'Buy Now':
-        return Colors.green;
-      case 'Open Editions':
-        return Colors.purple;
-      case 'Sold':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
   BottomNavigationBar _buildBottomNavBar(BuildContext context, int currentIndex) {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900] : Colors.white;
+    final iconColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+
     return BottomNavigationBar(
       currentIndex: currentIndex,
       type: BottomNavigationBarType.fixed,
       selectedItemColor: Colors.blue,
-      unselectedItemColor: Colors.grey,
+      unselectedItemColor: iconColor,
+      backgroundColor: backgroundColor,
       selectedLabelStyle: const TextStyle(fontSize: 12),
       unselectedLabelStyle: const TextStyle(fontSize: 12),
       onTap: (index) {
@@ -402,6 +337,112 @@ class _CategoriesPageState extends State<CategoriesPage> {
           label: 'Account',
         ),
       ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900] : Colors.white;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Categories',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: textColor,
+          ),
+        ),
+        centerTitle: true,
+        backgroundColor: backgroundColor,
+        iconTheme: IconThemeData(color: textColor),
+      ),
+      backgroundColor: backgroundColor,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 50,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: List.generate(_filters.length, (index) {
+                  return Padding(
+                    padding: EdgeInsets.only(
+                        left: index == 0 ? 0 : 8, 
+                        right: index == _filters.length - 1 ? 0 : 8),
+                    child: FilterChip(
+                      label: Text(_filters[index]),
+                      selected: _selectedFilterIndex == index,
+                      onSelected: (bool selected) {
+                        setState(() {
+                          _selectedFilterIndex = selected ? index : 0;
+                        });
+                        _navigateToFilteredProducts(_filters[index], null);
+                      },
+                      selectedColor: Colors.blue.withOpacity(0.2),
+                      checkmarkColor: Colors.blue,
+                      labelStyle: TextStyle(
+                        color: _selectedFilterIndex == index 
+                            ? Colors.blue 
+                            : textColor,
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            Text(
+              'Categories',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              childAspectRatio: 1.2,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              children: _categories.map((category) {
+                return _buildCategoryItem(category, _getCategoryIcon(category));
+              }).toList(),
+            ),
+            
+            const SizedBox(height: 24),
+            Text(
+              'Popular in Categories',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 220,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _popularItems.length,
+                itemBuilder: (context, index) {
+                  return _buildProductCard(_popularItems[index], context);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: _buildBottomNavBar(context, 1),
     );
   }
 }

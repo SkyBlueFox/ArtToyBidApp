@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/theme_provider.dart';
 import 'product_detail_screen.dart';
 import 'watchlist_service.dart';
 
@@ -16,37 +18,71 @@ class FilteredProductsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+    final backgroundColor = themeProvider.isDarkMode 
+        ? Colors.grey[900]! // Non-null assertion
+        : Colors.white;
+    final cardColor = themeProvider.isDarkMode 
+        ? Colors.grey[800]! // Non-null assertion
+        : Colors.white;
+    final secondaryTextColor = themeProvider.isDarkMode 
+        ? Colors.grey[300]! // Non-null assertion
+        : Colors.grey[600]!;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
           category != null 
               ? '$category - $filterType' 
               : filterType,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
+            color: textColor,
           ),
         ),
         centerTitle: true,
+        backgroundColor: backgroundColor,
+        iconTheme: IconThemeData(color: textColor),
       ),
+      backgroundColor: backgroundColor,
       body: products.isEmpty
-          ? const Center(
-              child: Text('No products found'),
+          ? Center(
+              child: Text(
+                'No products found',
+                style: TextStyle(color: textColor),
+              ),
             )
           : ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: products.length,
               itemBuilder: (context, index) {
                 final product = products[index];
-                return _buildProductItem(product, context);
+                return _buildProductItem(
+                  product, 
+                  context,
+                  textColor: textColor,
+                  cardColor: cardColor,
+                  secondaryTextColor: secondaryTextColor,
+                );
               },
             ),
     );
   }
 
-  Widget _buildProductItem(Map<String, dynamic> product, BuildContext context) {
+  Widget _buildProductItem(
+    Map<String, dynamic> product, 
+    BuildContext context, {
+    required Color textColor,
+    required Color cardColor,
+    required Color secondaryTextColor,
+  }) {
+    final price = _parsePrice(product['price']);
+    
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
+      color: cardColor,
       child: InkWell(
         onTap: () {
           Navigator.push(
@@ -88,13 +124,14 @@ class FilteredProductsPage extends StatelessWidget {
                   children: [
                     Text(
                       product['name'],
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w600,
+                        color: textColor,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '\$${product['price'].toStringAsFixed(2)}',
+                      '\$${price.toStringAsFixed(2)}',
                       style: const TextStyle(
                         color: Colors.blue,
                         fontWeight: FontWeight.w700,
@@ -104,7 +141,7 @@ class FilteredProductsPage extends StatelessWidget {
                     Text(
                       product['description'],
                       style: TextStyle(
-                        color: Colors.grey.shade600,
+                        color: secondaryTextColor,
                         fontSize: 12,
                       ),
                       maxLines: 2,
@@ -126,6 +163,18 @@ class FilteredProductsPage extends StatelessWidget {
                   } else {
                     WatchlistService.addToWatchlist(product);
                   }
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        WatchlistService.isInWatchlist(product['name'])
+                            ? 'Added to watchlist'
+                            : 'Removed from watchlist',
+                        style: TextStyle(color: textColor),
+                      ),
+                      backgroundColor: cardColor,
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
                 },
               ),
             ],
@@ -133,5 +182,13 @@ class FilteredProductsPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  double _parsePrice(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
   }
 }

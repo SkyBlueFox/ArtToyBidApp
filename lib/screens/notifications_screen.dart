@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'cart_service.dart';
-import 'order_status_screen.dart';
+import 'notification_service.dart';
 
 class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final notifications = NotificationService.notifications;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -17,93 +18,62 @@ class NotificationsPage extends StatelessWidget {
           ),
         ),
       ),
-      body: _buildNotificationContent(context),
+      body: notifications.isEmpty
+          ? _buildEmptyNotifications()
+          : _buildNotificationContent(context, notifications),
       bottomNavigationBar: _buildBottomNavBar(context),
     );
   }
 
-  Widget _buildNotificationContent(BuildContext context) {
-    final orderNotifications = _getOrderStatusNotifications(context);
-    
+  Widget _buildEmptyNotifications() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.notifications_off, size: 60, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(
+            'No notifications yet',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'You will see notifications here when you have updates',
+            style: TextStyle(color: Colors.grey[500]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationContent(BuildContext context, List<Map<String, dynamic>> notifications) {
     return ListView(
       children: [
-        if (orderNotifications.isNotEmpty) 
-          _buildNotificationSection('ORDERS', orderNotifications),
-          
-        _buildNotificationSection('TODAY', [
-          _buildNotificationItem(
+        _buildNotificationSection('RECENT', notifications.take(5).map((notification) {
+          return _buildNotificationItem(
             context: context,
-            icon: Icons.gavel,
-            title: 'Bid Accepted',
-            subtitle: 'Your bid of \$250 was accepted for "Limited Edition Figure"',
-            time: '2 minutes ago',
-            category: 'Auction',
-          ),
-          _buildNotificationItem(
-            context: context,
-            icon: Icons.comment,
-            title: 'New Comment',
-            subtitle: '@artcollector commented: "Beautiful piece!"',
-            time: '1 hour ago',
-            category: 'Social',
-          ),
-        ]),
-        
-        _buildNotificationSection('YESTERDAY', [
-          _buildNotificationItem(
-            context: context,
-            icon: Icons.payment,
-            title: 'Payment Received',
-            subtitle: 'You received \$180 for "Custom Figurine"',
-            time: 'Yesterday at 15:30',
-            category: 'Payment',
-          ),
-        ]),
-        
-        TextButton(
-          onPressed: () {},
-          child: const Text('Load more notifications'),
-        ),
+            icon: _getCategoryIcon(notification['category']),
+            title: notification['title'],
+            subtitle: notification['message'],
+            time: _formatTimeDifference(DateTime.now().difference(notification['timestamp'])),
+            category: notification['category'],
+          );
+        }).toList()),
       ],
     );
   }
 
-  List<Widget> _getOrderStatusNotifications(BuildContext context) {
-    final notifications = <Widget>[];
-    
-    for (final order in CartService.orders) {
-      final statusHistory = order['statusHistory'] as List<dynamic>? ?? [];
-      
-      for (final statusUpdate in statusHistory.reversed.take(3)) { // Show only latest 3 updates per order
-        if (statusUpdate['date'] is DateTime) {
-          final timeDiff = DateTime.now().difference(statusUpdate['date']);
-          final status = statusUpdate['status']?.toString() ?? 'Update';
-          
-          notifications.add(
-            _buildNotificationItem(
-              context: context,
-              icon: _getStatusIcon(status),
-              title: 'Order #${order['orderId']} - $status',
-              subtitle: statusUpdate['message']?.toString() ?? 'Order status updated',
-              time: _formatTimeDifference(timeDiff),
-              category: 'Order',
-            ),
-          );
-        }
-      }
-    }
-    
-    return notifications;
-  }
-
-  IconData _getStatusIcon(String status) {
-    switch (status.toLowerCase()) {
-      case 'processing':
-        return Icons.inventory;
-      case 'shipped':
-        return Icons.local_shipping;
-      case 'delivered':
-        return Icons.check_circle;
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'auction':
+        return Icons.gavel;
+      case 'order':
+        return Icons.shopping_bag;
+      case 'payment':
+        return Icons.payment;
       default:
         return Icons.notifications;
     }
@@ -194,17 +164,6 @@ class NotificationsPage extends StatelessWidget {
           ),
         ],
       ),
-      onTap: () {
-        if (category == 'Order') {
-          final orderId = title.split('#')[1].split(' -')[0].trim();
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => OrderStatusScreen(orderId: orderId),
-            ),
-          );
-        }
-      },
     );
   }
 

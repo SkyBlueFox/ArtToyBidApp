@@ -14,22 +14,54 @@ class _WatchlistScreenState extends State<WatchlistPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Your Watchlist',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
+        title: const Center( // Centered title
+          child: Text(
+            'Your Watchlist',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
+        centerTitle: true, // Ensure title is centered
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: WatchlistService.watchlistItems.length,
-        itemBuilder: (context, index) {
-          final item = WatchlistService.watchlistItems[index];
-          return _buildWatchlistItem(item, context);
-        },
-      ),
+      body: WatchlistService.watchlistItems.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.favorite_border,
+                    size: 48,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'No items in your watchlist',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Tap the heart icon to add items',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: WatchlistService.watchlistItems.length,
+              itemBuilder: (context, index) {
+                final item = WatchlistService.watchlistItems[index];
+                return _buildWatchlistItem(item, context);
+              },
+            ),
       bottomNavigationBar: _buildBottomNavBar(context, 2),
     );
   }
