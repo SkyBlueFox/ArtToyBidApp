@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/theme_provider.dart';
 import 'notification_service.dart';
 
 class NotificationsPage extends StatelessWidget {
@@ -6,62 +8,90 @@ class NotificationsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
+    final cardColor = themeProvider.isDarkMode ? Colors.grey[800]! : Colors.white;
+    final dividerColor = themeProvider.isDarkMode ? Colors.grey[700]! : Colors.grey[300]!;
+
     final notifications = NotificationService.notifications;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Notifications',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
+            color: textColor,
           ),
         ),
+        backgroundColor: backgroundColor,
+        iconTheme: IconThemeData(color: textColor),
       ),
+      backgroundColor: backgroundColor,
       body: notifications.isEmpty
-          ? _buildEmptyNotifications()
-          : _buildNotificationContent(context, notifications),
-      bottomNavigationBar: _buildBottomNavBar(context),
+          ? _buildEmptyNotifications(textColor)
+          : _buildNotificationContent(
+              context, 
+              notifications,
+              textColor: textColor,
+              cardColor: cardColor,
+              dividerColor: dividerColor,
+            ),
+      bottomNavigationBar: _buildBottomNavBar(context, themeProvider),
     );
   }
 
-  Widget _buildEmptyNotifications() {
+  Widget _buildEmptyNotifications(Color textColor) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.notifications_off, size: 60, color: Colors.grey[400]),
+          Icon(Icons.notifications_off, size: 60, color: textColor.withOpacity(0.5)),
           const SizedBox(height: 16),
           Text(
             'No notifications yet',
             style: TextStyle(
               fontSize: 18,
-              color: Colors.grey[600],
+              color: textColor,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'You will see notifications here when you have updates',
-            style: TextStyle(color: Colors.grey[500]),
+            style: TextStyle(color: textColor.withOpacity(0.7)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildNotificationContent(BuildContext context, List<Map<String, dynamic>> notifications) {
+  Widget _buildNotificationContent(
+    BuildContext context, 
+    List<Map<String, dynamic>> notifications, {
+    required Color textColor,
+    required Color cardColor,
+    required Color dividerColor,
+  }) {
     return ListView(
       children: [
-        _buildNotificationSection('RECENT', notifications.take(5).map((notification) {
-          return _buildNotificationItem(
-            context: context,
-            icon: _getCategoryIcon(notification['category']),
-            title: notification['title'],
-            subtitle: notification['message'],
-            time: _formatTimeDifference(DateTime.now().difference(notification['timestamp'])),
-            category: notification['category'],
-          );
-        }).toList()),
+        _buildNotificationSection(
+          'RECENT', 
+          notifications.take(5).map((notification) {
+            return _buildNotificationItem(
+              context: context,
+              icon: _getCategoryIcon(notification['category']),
+              title: notification['title'],
+              subtitle: notification['message'],
+              time: _formatTimeDifference(DateTime.now().difference(notification['timestamp'])),
+              category: notification['category'],
+              textColor: textColor,
+              cardColor: cardColor,
+            );
+          }).toList(),
+          textColor: textColor,
+        ),
       ],
     );
   }
@@ -87,7 +117,7 @@ class NotificationsPage extends StatelessWidget {
     return '${difference.inDays}d ago';
   }
 
-  Widget _buildNotificationSection(String title, List<Widget> notifications) {
+  Widget _buildNotificationSection(String title, List<Widget> notifications, {required Color textColor}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -95,10 +125,10 @@ class NotificationsPage extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Colors.grey,
+              color: textColor.withOpacity(0.7),
             ),
           ),
         ),
@@ -114,6 +144,8 @@ class NotificationsPage extends StatelessWidget {
     required String subtitle,
     required String time,
     required String category,
+    required Color textColor,
+    required Color cardColor,
   }) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -127,13 +159,19 @@ class NotificationsPage extends StatelessWidget {
       ),
       title: Text(
         title,
-        style: const TextStyle(fontWeight: FontWeight.w500),
+        style: TextStyle(
+          fontWeight: FontWeight.w500,
+          color: textColor,
+        ),
       ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 4),
-          Text(subtitle),
+          Text(
+            subtitle,
+            style: TextStyle(color: textColor.withOpacity(0.7)),
+          ),
           const SizedBox(height: 4),
           Row(
             children: [
@@ -141,7 +179,7 @@ class NotificationsPage extends StatelessWidget {
                 time,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey.shade600,
+                  color: textColor.withOpacity(0.5),
                 ),
               ),
               const SizedBox(width: 8),
@@ -186,12 +224,17 @@ class NotificationsPage extends StatelessWidget {
     return _getCategoryColor(category).withOpacity(0.1);
   }
 
-  BottomNavigationBar _buildBottomNavBar(BuildContext context) {
+  BottomNavigationBar _buildBottomNavBar(BuildContext context, ThemeProvider themeProvider) {
+    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
+    final selectedColor = Colors.blue;
+    final unselectedColor = themeProvider.isDarkMode ? Colors.grey[500]! : Colors.grey;
+
     return BottomNavigationBar(
       type: BottomNavigationBarType.fixed,
       currentIndex: 0,
-      selectedItemColor: Colors.blue,
-      unselectedItemColor: Colors.grey,
+      backgroundColor: backgroundColor,
+      selectedItemColor: selectedColor,
+      unselectedItemColor: unselectedColor,
       onTap: (index) {
         if (index == 0) {
           Navigator.pushNamedAndRemoveUntil(

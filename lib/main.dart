@@ -90,7 +90,7 @@ class ArtToyApp extends StatelessWidget {
         ),
       ),
       themeMode: themeProvider.themeMode,
-      initialRoute: '/auth-check',
+      initialRoute: '/signin',
       routes: {
         '/auth-check': (context) => const AuthChecker(),
         '/signin': (context) => const SignInPage(),

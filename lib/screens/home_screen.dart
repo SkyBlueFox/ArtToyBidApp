@@ -53,9 +53,9 @@ class HomePage extends StatelessWidget {
           children: [
             _buildPromoBanner(context),
             _buildSectionTitle('Recommendation', textColor),
-            _buildRecommendationList(context),
+            _buildRecommendationList(context, textColor),
             _buildSectionTitle('Popular Items', textColor),
-            _buildPopularItems(context),
+            _buildPopularItems(context, textColor),
           ],
         ),
       ),
@@ -114,7 +114,6 @@ class HomePage extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             title,
@@ -129,7 +128,7 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildRecommendationList(BuildContext context) {
+  Widget _buildRecommendationList(BuildContext context, Color textColor) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDarkMode = themeProvider.isDarkMode;
     final cardColor = isDarkMode ? Colors.grey[800] : Colors.white;
@@ -140,10 +139,13 @@ class HomePage extends StatelessWidget {
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              'Error loading recommendations',
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+          return SizedBox(
+            height: 220,
+            child: Center(
+              child: Text(
+                'Failed to load recommendations',
+                style: TextStyle(color: textColor),
+              ),
             ),
           );
         }
@@ -162,8 +164,8 @@ class HomePage extends StatelessWidget {
             height: 220,
             child: Center(
               child: Text(
-                'No recommendations found',
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                'No recommendations available',
+                style: TextStyle(color: textColor),
               ),
             ),
           );
@@ -177,11 +179,16 @@ class HomePage extends StatelessWidget {
             itemCount: recommendations.length,
             itemBuilder: (context, index) {
               final product = recommendations[index].data() as Map<String, dynamic>;
-              return _buildProductCard(
-                product, 
-                context, 
-                cardColor,
-                recommendations[index].id,
+              return Container(
+                width: 160,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                child: _buildProductCard(
+                  product, 
+                  context, 
+                  cardColor,
+                  recommendations[index].id,
+                  textColor: textColor,
+                ),
               );
             },
           ),
@@ -190,7 +197,7 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildPopularItems(BuildContext context) {
+  Widget _buildPopularItems(BuildContext context, Color textColor) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDarkMode = themeProvider.isDarkMode;
     final cardColor = isDarkMode ? Colors.grey[800] : Colors.white;
@@ -201,8 +208,8 @@ class HomePage extends StatelessWidget {
         if (snapshot.hasError) {
           return Center(
             child: Text(
-              'Error loading popular items',
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+              'Failed to load products',
+              style: TextStyle(color: textColor),
             ),
           );
         }
@@ -211,13 +218,13 @@ class HomePage extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final popularItems = snapshot.data?.docs ?? [];
+        final products = snapshot.data?.docs ?? [];
 
-        if (popularItems.isEmpty) {
+        if (products.isEmpty) {
           return Center(
             child: Text(
-              'No products found',
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+              'No products available',
+              style: TextStyle(color: textColor),
             ),
           );
         }
@@ -228,9 +235,15 @@ class HomePage extends StatelessWidget {
           crossAxisCount: 2,
           childAspectRatio: 0.8,
           padding: const EdgeInsets.all(8),
-          children: popularItems.map((doc) {
+          children: products.map((doc) {
             final product = doc.data() as Map<String, dynamic>;
-            return _buildProductCard(product, context, cardColor, doc.id);
+            return _buildProductCard(
+              product, 
+              context, 
+              cardColor,
+              doc.id,
+              textColor: textColor,
+            );
           }).toList(),
         );
       },
@@ -241,12 +254,9 @@ class HomePage extends StatelessWidget {
     Map<String, dynamic> product, 
     BuildContext context, 
     Color? cardColor,
-    String productId,
-  ) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDarkMode = themeProvider.isDarkMode;
-    final textColor = isDarkMode ? Colors.white : Colors.black;
-
+    String productId, {
+    required Color textColor,
+  }) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -309,15 +319,18 @@ class HomePage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    product['name'] ?? 'Unknown Product',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                      color: textColor,
+                  SizedBox(
+                    height: 40,
+                    child: Text(
+                      product['name'] ?? 'Unknown Product',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: textColor,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Text(

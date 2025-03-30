@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../providers/theme_provider.dart';
 import 'cart_service.dart';
 import 'notification_service.dart';
 
@@ -117,6 +119,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final isDarkMode = themeProvider.isDarkMode;
+    final textColor = isDarkMode ? Colors.white : Colors.black;
+    final cardColor = isDarkMode ? Colors.grey[800] : Colors.white;
+    final backgroundColor = isDarkMode ? Colors.grey[900] : Colors.grey[100];
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Checkout'),
@@ -135,32 +143,50 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Complete Your Purchase',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
                     ),
                     const SizedBox(height: 24),
                     
                     // Order Items
                     Card(
                       elevation: 2,
+                      color: cardColor,
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               'Your Items',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: textColor,
+                              ),
                             ),
                             const Divider(),
                             ...widget.selectedItems.map((item) => ListTile(
                               leading: item['image'] != null
                                   ? Image.asset(item['image'], width: 50, height: 50)
-                                  : const Icon(Icons.shopping_bag),
-                              title: Text(item['name'] ?? 'Unknown Item'),
-                              subtitle: Text('Qty: ${item['quantity'] ?? 1}'),
-                              trailing: Text(_formatPrice(item['price'] ?? 0)),
+                                  : Icon(Icons.shopping_bag, color: textColor),
+                              title: Text(
+                                item['name'] ?? 'Unknown Item',
+                                style: TextStyle(color: textColor),
+                              ),
+                              subtitle: Text(
+                                'Qty: ${item['quantity'] ?? 1}',
+                                style: TextStyle(color: textColor),
+                              ),
+                              trailing: Text(
+                                _formatPrice(item['price'] ?? 0),
+                                style: TextStyle(color: textColor),
+                              ),
                             )).toList(),
                           ],
                         ),
@@ -169,14 +195,27 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     const SizedBox(height: 24),
 
                     // Shipping Method
-                    const Text(
+                    Text(
                       'Shipping Method',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
                     ),
                     ..._shippingOptions.asMap().entries.map((entry) => RadioListTile<int>(
-                      title: Text(entry.value['title']),
-                      subtitle: Text(entry.value['duration']),
-                      secondary: Text(_formatPrice(entry.value['price'])),
+                      title: Text(
+                        entry.value['title'],
+                        style: TextStyle(color: textColor),
+                      ),
+                      subtitle: Text(
+                        entry.value['duration'],
+                        style: TextStyle(color: textColor),
+                      ),
+                      secondary: Text(
+                        _formatPrice(entry.value['price']),
+                        style: TextStyle(color: textColor),
+                      ),
                       value: entry.key,
                       groupValue: _selectedShippingIndex,
                       onChanged: (value) => setState(() => _selectedShippingIndex = value!),
@@ -184,31 +223,47 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     const SizedBox(height: 16),
 
                     // Shipping Address
-                    const Text(
+                    Text(
                       'Shipping Address',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _addressController,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Full Address',
+                        labelStyle: TextStyle(color: textColor),
                         border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.location_on),
+                        prefixIcon: Icon(Icons.location_on, color: textColor),
                       ),
+                      style: TextStyle(color: textColor),
                       maxLines: 3,
                       validator: (value) => value?.isEmpty ?? true ? 'Please enter address' : null,
                     ),
                     const SizedBox(height: 16),
 
                     // Payment Method
-                    const Text(
+                    Text(
                       'Payment Method',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
                     ),
                     ..._paymentOptions.asMap().entries.map((entry) => RadioListTile<int>(
-                      title: Text(entry.value['title']),
-                      secondary: Icon(entry.value['icon']),
+                      title: Text(
+                        entry.value['title'],
+                        style: TextStyle(color: textColor),
+                      ),
+                      secondary: Icon(
+                        entry.value['icon'],
+                        color: textColor,
+                      ),
                       value: entry.key,
                       groupValue: _selectedPaymentIndex,
                       onChanged: (value) => setState(() => _selectedPaymentIndex = value!),
@@ -219,21 +274,25 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _nameController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Cardholder Name',
+                          labelStyle: TextStyle(color: textColor),
                           border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.person),
+                          prefixIcon: Icon(Icons.person, color: textColor),
                         ),
+                        style: TextStyle(color: textColor),
                         validator: (value) => value?.isEmpty ?? true ? 'Please enter name' : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _cardController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Card Number',
+                          labelStyle: TextStyle(color: textColor),
                           border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.credit_card),
+                          prefixIcon: Icon(Icons.credit_card, color: textColor),
                         ),
+                        style: TextStyle(color: textColor),
                         keyboardType: TextInputType.number,
                         validator: (value) {
                           if (value?.isEmpty ?? true) return 'Please enter card number';
@@ -252,7 +311,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: backgroundColor,
                 border: Border(top: BorderSide(color: Colors.grey.shade300)),
               ),
               child: Column(
@@ -277,7 +336,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                           ? const CircularProgressIndicator(color: Colors.white)
                           : const Text(
                               'Complete Payment',
-                              style: TextStyle(fontSize: 18),
+                              style: TextStyle(fontSize: 18, color: Colors.white),
                             ),
                     ),
                   ),
@@ -291,6 +350,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Widget _buildSummaryRow(String label, String value, {bool isTotal = false}) {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+    
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -301,6 +363,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             style: TextStyle(
               fontSize: isTotal ? 18 : 16,
               fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+              color: textColor,
             ),
           ),
           Text(
@@ -308,7 +371,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             style: TextStyle(
               fontSize: isTotal ? 18 : 16,
               fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-              color: isTotal ? Colors.blue : null,
+              color: isTotal ? Colors.blue : textColor,
             ),
           ),
         ],

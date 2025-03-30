@@ -85,7 +85,9 @@ class _CartScreenState extends State<CartScreen> {
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+    final isDarkMode = themeProvider.isDarkMode;
+    final textColor = isDarkMode ? Colors.white : Colors.black;
+    final backgroundColor = isDarkMode ? Colors.grey[900] : Colors.grey[100];
     
     return Scaffold(
       appBar: AppBar(
@@ -93,6 +95,8 @@ class _CartScreenState extends State<CartScreen> {
           'My Cart',
           style: TextStyle(color: textColor),
         ),
+        backgroundColor: isDarkMode ? Colors.grey[800] : Colors.white,
+        iconTheme: IconThemeData(color: textColor),
         actions: [
           if (_cartItems.isNotEmpty)
             IconButton(
@@ -109,6 +113,7 @@ class _CartScreenState extends State<CartScreen> {
             ),
         ],
       ),
+      backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
       body: _cartItems.isEmpty
           ? _buildEmptyCart(context, textColor)
           : Column(
@@ -123,7 +128,7 @@ class _CartScreenState extends State<CartScreen> {
                     },
                   ),
                 ),
-                _buildCheckoutSection(context, textColor),
+                _buildCheckoutSection(context, textColor, backgroundColor),
               ],
             ),
     );
@@ -137,6 +142,8 @@ class _CartScreenState extends State<CartScreen> {
     Color textColor,
   ) {
     final isAuctionItem = item['isAuction'] == true;
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final cardColor = themeProvider.isDarkMode ? Colors.grey[800] : Colors.white;
     
     return Dismissible(
       key: Key('${item['name']}_${index.toString()}'),
@@ -149,6 +156,7 @@ class _CartScreenState extends State<CartScreen> {
       ),
       onDismissed: (direction) => _removeItem(index),
       child: Card(
+        color: cardColor,
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: ListTile(
           leading: item['image'] != null
@@ -215,11 +223,11 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _buildCheckoutSection(BuildContext context, Color textColor) {
+  Widget _buildCheckoutSection(BuildContext context, Color textColor, Color? backgroundColor) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: backgroundColor,
         border: Border(top: BorderSide(color: Colors.grey.shade300)),
       ),
       child: Column(

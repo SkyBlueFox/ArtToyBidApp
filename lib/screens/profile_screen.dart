@@ -5,8 +5,12 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:camera/camera.dart';
+import 'package:provider/provider.dart';
 import 'dart:io';
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import '../providers/theme_provider.dart';
 import '../services/google_drive_service.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -23,6 +27,9 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isUploading = false;
   late List<CameraDescription> _cameras;
   StreamSubscription<User?>? _authSubscription;
+  List<Map<String, dynamic>> _biddingHistory = [];
+  bool _isLoadingBids = true;
+  StreamSubscription<QuerySnapshot>? _bidsSubscription;
 
   @override
   void initState() {
@@ -31,6 +38,7 @@ class _ProfilePageState extends State<ProfilePage> {
     _initializeServices();
     _loadUser();
     _setupAuthListener();
+    _setupBiddingHistoryListener();
   }
 
   Future<void> _initializeServices() async {
@@ -44,52 +52,135 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  void _setupBiddingHistoryListener() {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    setState(() => _isLoadingBids = true);
+
+    _bidsSubscription = FirebaseFirestore.instance
+        .collection('products')
+        .where('currentBidderId', isEqualTo: userId)
+        .orderBy('endTime', descending: true)
+        .snapshots()
+        .listen((snapshot) {
+      if (mounted) {
+        setState(() {
+          _biddingHistory = snapshot.docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return {
+              'productId': doc.id,
+              'productName': data['name'] ?? 'Unknown Product',
+              'amount': (data['currentBid'] as num?)?.toDouble() ?? 0.0,
+              'timestamp': _parseDateString(data['endTime']),
+              'status': _determineBidStatus(data, userId),
+              'imageUrl': data['imageUrl'] ?? data['image'],
+            };
+          }).toList();
+          _isLoadingBids = false;
+        });
+      }
+    }, onError: (e) {
+      if (mounted) {
+        setState(() => _isLoadingBids = false);
+        _showErrorSnackbar('Failed to load bidding history: $e');
+      }
+    });
+  }
+
+  DateTime _parseDateString(dynamic dateValue) {
+    if (dateValue == null) return DateTime.now();
+    if (dateValue is Timestamp) return dateValue.toDate();
+    if (dateValue is DateTime) return dateValue;
+    
+    try {
+      if (dateValue.toString().contains('T')) {
+        return DateTime.parse(dateValue.toString());
+      }
+      final formatted = dateValue.toString().replaceAll(' at ', ' ');
+      return DateFormat('MMMM d, y h:mm:ss a z').parse(formatted);
+    } catch (e) {
+      return DateTime.now();
+    }
+  }
+
+  String _determineBidStatus(Map<String, dynamic> productData, String userId) {
+    final endTime = _parseDateString(productData['endTime']);
+    final now = DateTime.now();
+    final isAuctionEnded = endTime.isBefore(now);
+    final isHighestBidder = productData['currentBidderId'] == userId;
+
+    if (!isAuctionEnded) {
+      return isHighestBidder ? 'Winning' : 'Outbid';
+    } else {
+      return isHighestBidder ? 'Won' : 'Lost';
+    }
+  }
+
   @override
   void dispose() {
     _authSubscription?.cancel();
+    _bidsSubscription?.cancel();
     super.dispose();
   }
 
   Future<void> _showImageSourceDialog() async {
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
+    final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+
     return showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Edit Profile Picture'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.camera_alt),
-                  title: const Text('Take Photo'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _openCamera();
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.photo_library),
-                  title: const Text('Choose from Gallery'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImage();
-                  },
-                ),
-                if (_profileImage != null)
-                  ListTile(
-                    leading: const Icon(Icons.delete, color: Colors.red),
-                    title: const Text(
-                      'Remove Photo',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _deleteProfileImage();
-                    },
-                  ),
-              ],
-            ),
+      builder: (context) => Theme(
+        data: Theme.of(context).copyWith(
+          dialogBackgroundColor: backgroundColor,
+        ),
+        child: AlertDialog(
+          title: Text(
+            'Edit Profile Picture',
+            style: TextStyle(color: textColor),
           ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(Icons.camera_alt, color: textColor),
+                title: Text(
+                  'Take Photo',
+                  style: TextStyle(color: textColor),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _openCamera();
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.photo_library, color: textColor),
+                title: Text(
+                  'Choose from Gallery',
+                  style: TextStyle(color: textColor),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage();
+                },
+              ),
+              if (_profileImage != null)
+                ListTile(
+                  leading: const Icon(Icons.delete, color: Colors.red),
+                  title: const Text(
+                    'Remove Photo',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _deleteProfileImage();
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -102,19 +193,16 @@ class _ProfilePageState extends State<ProfilePage> {
     final imageFile = await Navigator.push<File>(
       context,
       MaterialPageRoute(
-        builder:
-            (context) => CameraPage(
-              cameras: _cameras,
-              onImageCaptured: (File imageFile) {
-                return imageFile;
-              },
-            ),
+        builder: (context) => CameraPage(
+          cameras: _cameras,
+          onImageCaptured: (File imageFile) => imageFile,
+        ),
       ),
     );
 
     if (imageFile != null && mounted) {
       await _uploadAndSetProfileImage(imageFile);
-    } else {}
+    }
   }
 
   Future<void> _uploadAndSetProfileImage(File imageFile) async {
@@ -126,13 +214,11 @@ class _ProfilePageState extends State<ProfilePage> {
       final userId = _currentUser?.uid;
       if (userId == null) throw Exception('User not logged in');
 
-      // The service automatically handles existing file deletion
       final imageUrl = await _driveService.uploadProfileImage(
         imageFile,
         userId,
       );
 
-      // Update Firebase user
       await _currentUser?.updatePhotoURL(imageUrl);
       await _refreshUser();
 
@@ -159,10 +245,7 @@ class _ProfilePageState extends State<ProfilePage> {
       if (userId == null) throw Exception('User not logged in');
 
       final success = await _driveService.deleteProfileImage(userId);
-
-      if (!success) {
-        throw Exception('Failed to remove profile picture');
-      }
+      if (!success) throw Exception('Failed to remove profile picture');
 
       await _currentUser?.updatePhotoURL(null);
       await _refreshUser();
@@ -229,9 +312,16 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _showErrorSnackbar(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[800]! : Colors.white;
+    final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: TextStyle(color: textColor)),
+        backgroundColor: backgroundColor,
+      ),
+    );
   }
 
   void _loadUser() {
@@ -241,35 +331,41 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _setupAuthListener() {
-    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((User? user) {
       if (mounted) {
-        setState(() => _currentUser = user); // Update if auth state changes
+        setState(() => _currentUser = user);
       }
     });
   }
 
   Future<void> _refreshUser() async {
     try {
-      await FirebaseAuth.instance.currentUser
-          ?.reload(); // Force Firebase refresh
-      _loadUser(); // Update UI
+      await FirebaseAuth.instance.currentUser?.reload();
+      _loadUser();
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error refreshing: $e')));
+      _showErrorSnackbar('Error refreshing: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
+    final cardColor = themeProvider.isDarkMode ? Colors.grey[800]! : Colors.white;
+    final dividerColor = themeProvider.isDarkMode ? Colors.grey[700]! : Colors.grey[300]!;
+
     final user = FirebaseAuth.instance.currentUser;
+    final dateFormat = DateFormat('MMM d, y - h:mm a');
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: Text('Profile', style: TextStyle(color: textColor)),
+        backgroundColor: backgroundColor,
+        iconTheme: IconThemeData(color: textColor),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: Icon(Icons.settings, color: textColor),
             onPressed: () async {
               await Navigator.push(
                 context,
@@ -280,6 +376,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ],
       ),
+      backgroundColor: backgroundColor,
       body: Stack(
         children: [
           SingleChildScrollView(
@@ -292,25 +389,18 @@ class _ProfilePageState extends State<ProfilePage> {
                     children: [
                       CircleAvatar(
                         radius: 40,
-                        backgroundImage:
-                            _profileImage != null
-                                ? FileImage(
-                                  _profileImage!,
-                                ) // Show local image if just uploaded
-                                : _currentUser?.photoURL != null
-                                ? NetworkImage(
-                                  _currentUser!.photoURL!,
-                                ) // Show from Firebase
+                        backgroundImage: _profileImage != null
+                            ? FileImage(_profileImage!)
+                            : _currentUser?.photoURL != null
+                                ? NetworkImage(_currentUser!.photoURL!)
                                 : null,
-                        child:
-                            _profileImage == null &&
-                                    _currentUser?.photoURL == null
-                                ? const Icon(
-                                  Icons.person,
-                                  size: 40,
-                                  color: Colors.white,
-                                )
-                                : null,
+                        child: _profileImage == null && _currentUser?.photoURL == null
+                            ? Icon(
+                                Icons.person,
+                                size: 40,
+                                color: textColor,
+                              )
+                            : null,
                       ),
                       if (!_isUploading)
                         Positioned(
@@ -318,14 +408,14 @@ class _ProfilePageState extends State<ProfilePage> {
                           right: 0,
                           child: Container(
                             padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Colors.blue,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).primaryColor,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.edit,
                               size: 16,
-                              color: Colors.white,
+                              color: textColor,
                             ),
                           ),
                         ),
@@ -335,19 +425,23 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 16),
                 Text(
                   user?.displayName ?? user?.email ?? 'Guest User',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: textColor,
+                  ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Joined 2 weeks ago',
-                  style: TextStyle(color: Colors.grey),
+                Text(
+                  'Joined ${dateFormat.format(user?.metadata.creationTime ?? DateTime.now())}',
+                  style: TextStyle(color: textColor.withOpacity(0.7)),
                 ),
                 const SizedBox(height: 16),
                 Column(
                   children: [
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
+                        backgroundColor: Theme.of(context).primaryColor,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -357,12 +451,12 @@ class _ProfilePageState extends State<ProfilePage> {
                       },
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(Icons.people, size: 20, color: Colors.white),
-                          SizedBox(width: 8),
+                        children: [
+                          Icon(Icons.people, size: 20, color: textColor),
+                          const SizedBox(width: 8),
                           Text(
                             'Community',
-                            style: TextStyle(color: Colors.white),
+                            style: TextStyle(color: textColor),
                           ),
                         ],
                       ),
@@ -373,56 +467,152 @@ class _ProfilePageState extends State<ProfilePage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.star, color: Colors.amber, size: 20),
+                    Icon(Icons.star, color: Colors.amber, size: 20),
                     const SizedBox(width: 4),
-                    const Text(
+                    Text(
                       '4.5',
-                      style: TextStyle(fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: textColor,
+                      ),
                     ),
                     const SizedBox(width: 4),
-                    const Text('(5 reviews)'),
+                    Text(
+                      '(5 reviews)',
+                      style: TextStyle(color: textColor.withOpacity(0.7)),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 24),
-                const Text(
-                  'Bidding history',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                Text(
+                  'Bidding History',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: textColor,
+                  ),
                 ),
                 const SizedBox(height: 16),
-                ListTile(
-                  leading: const Icon(Icons.gavel),
-                  title: const Text('Placed a bid of \$150 on Takashi'),
-                  subtitle: const Text('Apr 21, 2023'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.gavel),
-                  title: const Text('Placed a bid of \$100 on Kaws, Open'),
-                  subtitle: const Text('Apr 20, 2023'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
-                ),
+                if (_isLoadingBids)
+                  Center(child: CircularProgressIndicator(color: textColor))
+                else if (_biddingHistory.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'No bidding history yet',
+                      style: TextStyle(color: textColor.withOpacity(0.7)),
+                    ),
+                  )
+                else
+                  Column(
+                    children: _biddingHistory.map((bid) {
+                      return Column(
+                        children: [
+                          ListTile(
+                            leading: bid['imageUrl'] != null
+                                ? CircleAvatar(
+                                    backgroundImage: NetworkImage(bid['imageUrl']),
+                                    radius: 20,
+                                  )
+                                : Icon(Icons.gavel, color: textColor),
+                            title: Text(
+                              'Bid \$${bid['amount'].toStringAsFixed(2)} on ${bid['productName']}',
+                              style: TextStyle(color: textColor),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  dateFormat.format(bid['timestamp']),
+                                  style: TextStyle(color: textColor.withOpacity(0.7)),
+                                ),
+                                const SizedBox(height: 4),
+                                _buildBidStatusChip(bid['status'], textColor),
+                              ],
+                            ),
+                            trailing: Icon(Icons.chevron_right, color: textColor),
+                            onTap: () {
+                              // Navigate to product detail page
+                              // Navigator.push(context, MaterialPageRoute(
+                              //   builder: (context) => ProductDetailPage(
+                              //     productId: bid['productId'],
+                              //   ),
+                              // ));
+                            },
+                          ),
+                          Divider(color: dividerColor),
+                        ],
+                      );
+                    }).toList(),
+                  ),
               ],
             ),
           ),
           if (_isUploading) const Center(child: CircularProgressIndicator()),
         ],
       ),
-      bottomNavigationBar: _buildBottomNavBar(context, 3),
+      bottomNavigationBar: _buildBottomNavBar(context, 3, themeProvider),
+    );
+  }
+
+  Widget _buildBidStatusChip(String status, Color textColor) {
+    Color chipColor;
+    String displayText;
+    
+    switch (status.toLowerCase()) {
+      case 'winning':
+        chipColor = Colors.green;
+        displayText = 'Currently Winning';
+        break;
+      case 'outbid':
+        chipColor = Colors.orange;
+        displayText = 'Outbid';
+        break;
+      case 'won':
+        chipColor = Colors.green[800]!;
+        displayText = 'Auction Won';
+        break;
+      case 'lost':
+        chipColor = Colors.red;
+        displayText = 'Auction Lost';
+        break;
+      default:
+        chipColor = Colors.grey;
+        displayText = 'Pending';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: chipColor.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        displayText,
+        style: TextStyle(
+          color: chipColor,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 
   BottomNavigationBar _buildBottomNavBar(
     BuildContext context,
     int currentIndex,
+    ThemeProvider themeProvider,
   ) {
+    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
+    final selectedColor = Colors.blue;
+    final unselectedColor = themeProvider.isDarkMode ? Colors.grey[500]! : Colors.grey;
+
     return BottomNavigationBar(
       currentIndex: currentIndex,
       type: BottomNavigationBarType.fixed,
-      selectedItemColor: Colors.blue,
-      unselectedItemColor: Colors.grey,
+      backgroundColor: backgroundColor,
+      selectedItemColor: selectedColor,
+      unselectedItemColor: unselectedColor,
       selectedLabelStyle: const TextStyle(fontSize: 12),
       unselectedLabelStyle: const TextStyle(fontSize: 12),
       onTap: (index) {
@@ -493,15 +683,13 @@ class _CameraPageState extends State<CameraPage> {
   @override
   void initState() {
     super.initState();
-    _initializeCamera(0); // Start with first camera
+    _initializeCamera(0);
   }
 
   Future<void> _initializeCamera(int index) async {
     if (!mounted || index >= widget.cameras.length) return;
 
     setState(() => _isInitializing = true);
-
-    // Dispose previous controller if exists
     await _controller?.dispose();
 
     try {
@@ -536,26 +724,21 @@ class _CameraPageState extends State<CameraPage> {
   }
 
   Future<void> _takePicture() async {
-    if (_isInitializing ||
-        _controller == null ||
-        !_controller!.value.isInitialized) {
+    if (_isInitializing || _controller == null || !_controller!.value.isInitialized) {
       return;
     }
 
     try {
       final image = await _controller!.takePicture();
-
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       widget.onImageCaptured(File(image.path));
       Navigator.pop(context, File(image.path));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Failed to take picture')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to take picture')),
+        );
       }
     }
   }
@@ -568,42 +751,53 @@ class _CameraPageState extends State<CameraPage> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
+    final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Take Photo'),
+        title: Text('Take Photo', style: TextStyle(color: textColor)),
+        backgroundColor: backgroundColor,
+        iconTheme: IconThemeData(color: textColor),
         actions: [
           if (widget.cameras.length > 1)
             IconButton(
-              icon: const Icon(Icons.cameraswitch),
+              icon: Icon(Icons.cameraswitch, color: textColor),
               onPressed: _isInitializing ? null : _switchCamera,
             ),
         ],
       ),
-      body:
-          _isInitializing
-              ? const Center(child: CircularProgressIndicator())
-              : _controller != null && _controller!.value.isInitialized
+      backgroundColor: backgroundColor,
+      body: _isInitializing
+          ? Center(child: CircularProgressIndicator(color: textColor))
+          : _controller != null && _controller!.value.isInitialized
               ? Stack(
-                children: [
-                  CameraPreview(_controller!),
-                  Positioned(
-                    bottom: 24,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: FloatingActionButton(
-                        backgroundColor: Colors.white,
-                        onPressed: _takePicture,
-                        child: const Icon(
-                          Icons.camera_alt,
-                          color: Colors.black,
+                  children: [
+                    CameraPreview(_controller!),
+                    Positioned(
+                      bottom: 24,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: FloatingActionButton(
+                          backgroundColor: Colors.white,
+                          onPressed: _takePicture,
+                          child: const Icon(
+                            Icons.camera_alt,
+                            color: Colors.black,
+                          ),
                         ),
                       ),
                     ),
+                  ],
+                )
+              : Center(
+                  child: Text(
+                    'Camera unavailable',
+                    style: TextStyle(color: textColor),
                   ),
-                ],
-              )
-              : const Center(child: Text('Camera unavailable')),
+                ),
     );
   }
 }

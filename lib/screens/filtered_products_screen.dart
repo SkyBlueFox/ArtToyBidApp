@@ -19,7 +19,6 @@ class FilteredProductsPage extends StatelessWidget {
   Stream<QuerySnapshot> _getFilteredProductsStream() {
     Query query = _firestore.collection('products');
 
-    // Case 1: Filter by both category and sellType
     if (category != null && filterType != 'All') {
       query = query
           .where('type', isEqualTo: category)
@@ -28,21 +27,18 @@ class FilteredProductsPage extends StatelessWidget {
           .orderBy('sellType')
           .orderBy('updatedAt', descending: true);
     }
-    // Case 2: Filter only by category
     else if (category != null) {
       query = query
           .where('type', isEqualTo: category)
           .orderBy('type')
           .orderBy('updatedAt', descending: true);
     }
-    // Case 3: Filter only by sellType
     else if (filterType != 'All') {
       query = query
           .where('sellType', isEqualTo: filterType)
           .orderBy('sellType')
           .orderBy('updatedAt', descending: true);
     }
-    // Case 4: No filters (show all)
     else {
       query = query.orderBy('updatedAt', descending: true);
     }
@@ -54,22 +50,14 @@ class FilteredProductsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
-    final backgroundColor = themeProvider.isDarkMode 
-        ? Colors.grey[900]! 
-        : Colors.white;
-    final cardColor = themeProvider.isDarkMode 
-        ? Colors.grey[800]! 
-        : Colors.white;
-    final secondaryTextColor = themeProvider.isDarkMode 
-        ? Colors.grey[300]! 
-        : Colors.grey[600]!;
+    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
+    final cardColor = themeProvider.isDarkMode ? Colors.grey[800]! : Colors.white;
+    final secondaryTextColor = themeProvider.isDarkMode ? Colors.grey[300]! : Colors.grey[600]!;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          category != null 
-              ? '$category - $filterType' 
-              : filterType,
+          category != null ? '$category - $filterType' : filterType,
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -173,7 +161,7 @@ class FilteredProductsPage extends StatelessWidget {
                           product['image'],
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) => 
-                            const Icon(Icons.broken_image),
+                            Icon(Icons.broken_image, color: textColor),
                         )
                       : Icon(
                           Icons.image,

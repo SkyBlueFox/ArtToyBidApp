@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/theme_provider.dart';
 import 'cart_service.dart';
 
 class OrderStatusScreen extends StatelessWidget {
@@ -8,48 +10,78 @@ class OrderStatusScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
+    final cardColor = themeProvider.isDarkMode ? Colors.grey[800]! : Colors.white;
+    final dividerColor = themeProvider.isDarkMode ? Colors.grey[700]! : Colors.grey[300]!;
+
     try {
-      // Safe way to find order with null check
       final order = CartService.orders.firstWhere(
         (order) => order['orderId'] == orderId,
       );
 
-      // Ensure statusHistory exists and is a List
       final statusHistory = (order['statusHistory'] as List<dynamic>?) ?? [];
 
       return Scaffold(
-        appBar: AppBar(title: Text('Order #${order['orderId']}')),
+        appBar: AppBar(
+          title: Text(
+            'Order #${order['orderId']}',
+            style: TextStyle(color: textColor),
+          ),
+          backgroundColor: backgroundColor,
+          iconTheme: IconThemeData(color: textColor),
+        ),
+        backgroundColor: backgroundColor,
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Order summary
               Card(
+                color: cardColor,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      Text('Current Status: ${order['status']}',
-                          style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text(
+                        'Current Status: ${order['status']}',
+                        style: TextStyle(
+                          fontSize: 18, 
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
+                      ),
                       const SizedBox(height: 8),
-                      Text('Tracking #: ${order['trackingNumber']}'),
-                      Text('Order Date: ${order['date'].toString().split(' ')[0]}'),
+                      Text(
+                        'Tracking #: ${order['trackingNumber']}',
+                        style: TextStyle(color: textColor),
+                      ),
+                      Text(
+                        'Order Date: ${order['date'].toString().split(' ')[0]}',
+                        style: TextStyle(color: textColor),
+                      ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 24),
               
-              // Status timeline
-              const Text('Status Timeline',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(
+                'Status Timeline',
+                style: TextStyle(
+                  fontSize: 18, 
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+              ),
               const SizedBox(height: 16),
               
-              // Safe timeline builder
               if (statusHistory.isEmpty)
-                const Text('No status updates available')
+                Text(
+                  'No status updates available',
+                  style: TextStyle(color: textColor),
+                )
               else
                 ...statusHistory.map<Widget>((entry) {
                   final status = entry['status'] as String? ?? 'Unknown';
@@ -69,12 +101,23 @@ class OrderStatusScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(status,
-                                  style: const TextStyle(fontWeight: FontWeight.bold)),
-                              Text(message),
-                              Text(date,
-                                  style: const TextStyle(
-                                      color: Colors.grey, fontSize: 12)),
+                              Text(
+                                status,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor,
+                                ),
+                              ),
+                              Text(
+                                message,
+                                style: TextStyle(color: textColor.withOpacity(0.7)),
+                              ),
+                              Text(
+                                date,
+                                style: TextStyle(
+                                  color: textColor.withOpacity(0.5), 
+                                  fontSize: 12),
+                              ),
                             ],
                           ),
                         ),
@@ -87,11 +130,18 @@ class OrderStatusScreen extends StatelessWidget {
         ),
       );
     } catch (e) {
-      // Handle case where order is not found
       return Scaffold(
-        appBar: AppBar(title: const Text('Error')),
-        body: const Center(
-          child: Text('Order not found or data is corrupted'),
+        appBar: AppBar(
+          title: const Text('Error'),
+          backgroundColor: backgroundColor,
+          iconTheme: IconThemeData(color: textColor),
+        ),
+        backgroundColor: backgroundColor,
+        body: Center(
+          child: Text(
+            'Order not found or data is corrupted',
+            style: TextStyle(color: textColor),
+          ),
         ),
       );
     }

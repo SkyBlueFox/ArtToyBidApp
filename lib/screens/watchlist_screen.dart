@@ -1,9 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:bid/providers/theme_provider.dart';
+import '../providers/theme_provider.dart';
 import 'product_detail_screen.dart';
 import 'watchlist_service.dart';
+
 
 class WatchlistPage extends StatefulWidget {
   const WatchlistPage({super.key});
@@ -17,19 +18,18 @@ class _WatchlistPageState extends State<WatchlistPage> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
-    final backgroundColor = themeProvider.isDarkMode 
-        ? Colors.grey[900]! 
-        : Colors.white;
+    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
+    final cardColor = themeProvider.isDarkMode ? Colors.grey[800]! : Colors.white;
+    final dividerColor = themeProvider.isDarkMode ? Colors.grey[700]! : Colors.grey[300]!;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Center(
-          child: Text(
-            'Your Watchlist',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
+        title: Text(
+          'Your Watchlist',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: textColor,
           ),
         ),
         centerTitle: true,
@@ -64,17 +64,17 @@ class _WatchlistPageState extends State<WatchlistPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.favorite_border,
                     size: 48,
-                    color: Colors.grey,
+                    color: textColor.withOpacity(0.5),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'No items in your watchlist',
                     style: TextStyle(
                       fontSize: 18,
-                      color: Colors.grey,
+                      color: textColor.withOpacity(0.7),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -82,7 +82,7 @@ class _WatchlistPageState extends State<WatchlistPage> {
                     'Tap the heart icon to add items',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey.shade500,
+                      color: textColor.withOpacity(0.5),
                     ),
                   ),
                 ],
@@ -96,26 +96,29 @@ class _WatchlistPageState extends State<WatchlistPage> {
             itemBuilder: (context, index) {
               final item = watchlistItems[index];
               final product = item.data() as Map<String, dynamic>;
-              return _buildWatchlistItem(item.id, product, context);
+              return _buildWatchlistItem(
+                item.id, 
+                product, 
+                context,
+                textColor: textColor,
+                cardColor: cardColor,
+              );
             },
           );
         },
       ),
-      bottomNavigationBar: _buildBottomNavBar(context, 2),
+      bottomNavigationBar: _buildBottomNavBar(context, 2, themeProvider),
     );
   }
 
   Widget _buildWatchlistItem(
     String productId,
     Map<String, dynamic> product, 
-    BuildContext context,
-  ) {
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
-    final cardColor = themeProvider.isDarkMode 
-        ? Colors.grey[800]! 
-        : Colors.white;
-    final price = _parsePrice(product['price']);
+    BuildContext context, {
+    required Color textColor,
+    required Color cardColor,
+  }) {
+    final price = _parsePrice(product['price'] ?? product['startBid']);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -155,13 +158,19 @@ class _WatchlistPageState extends State<WatchlistPage> {
                       product['imageUrl'],
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) => 
-                        Center(child: Icon(Icons.broken_image, size: 50)),
+                        Center(
+                          child: Icon(
+                            Icons.broken_image, 
+                            size: 50,
+                            color: textColor.withOpacity(0.5),
+                          ),
+                        ),
                     )
                   : Center(
                       child: Text(
                         'Product Image',
                         style: TextStyle(
-                          color: Colors.grey.shade600,
+                          color: textColor.withOpacity(0.5),
                         ),
                       ),
                     ),
@@ -178,6 +187,8 @@ class _WatchlistPageState extends State<WatchlistPage> {
                       fontWeight: FontWeight.w700,
                       color: textColor,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -193,8 +204,10 @@ class _WatchlistPageState extends State<WatchlistPage> {
                     product['description'] ?? 'No description',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey.shade700,
+                      color: textColor.withOpacity(0.7),
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -239,21 +252,21 @@ class _WatchlistPageState extends State<WatchlistPage> {
     return 0.0;
   }
 
-  BottomNavigationBar _buildBottomNavBar(BuildContext context, int currentIndex) {
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    final backgroundColor = themeProvider.isDarkMode 
-        ? Colors.grey[900]! 
-        : Colors.white;
-    final iconColor = themeProvider.isDarkMode 
-        ? Colors.white 
-        : Colors.black;
+  BottomNavigationBar _buildBottomNavBar(
+    BuildContext context, 
+    int currentIndex,
+    ThemeProvider themeProvider,
+  ) {
+    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
+    final selectedColor = Colors.blue;
+    final unselectedColor = themeProvider.isDarkMode ? Colors.grey[500]! : Colors.grey;
 
     return BottomNavigationBar(
       currentIndex: currentIndex,
       type: BottomNavigationBarType.fixed,
-      selectedItemColor: Colors.blue,
-      unselectedItemColor: iconColor,
       backgroundColor: backgroundColor,
+      selectedItemColor: selectedColor,
+      unselectedItemColor: unselectedColor,
       selectedLabelStyle: const TextStyle(fontSize: 12),
       unselectedLabelStyle: const TextStyle(fontSize: 12),
       onTap: (index) {

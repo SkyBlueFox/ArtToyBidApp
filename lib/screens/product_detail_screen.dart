@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import '../providers/theme_provider.dart';
 import 'watchlist_service.dart';
 import 'notification_service.dart';
 import 'cart_service.dart';
@@ -33,38 +35,59 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   bool isAuctionEnded = false;
   bool isLeadingBidder = false;
   bool isInWatchlist = false;
-  List<Map<String, dynamic>> biddingHistory = [];
   Map<String, dynamic>? productData;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  StreamSubscription<DocumentSnapshot>? _productSubscription;
 
   @override
   void initState() {
     super.initState();
-    _loadProductData();
+    _setupProductListener();
     _checkWatchlistStatus();
   }
 
-  Future<void> _loadProductData() async {
-    try {
-      final doc = await _firestore.collection('products').doc(widget.productId).get();
-      if (doc.exists) {
+  void _setupProductListener() {
+    _productSubscription = _firestore
+        .collection('products')
+        .doc(widget.productId)
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists && mounted) {
         setState(() {
-          productData = doc.data() as Map<String, dynamic>;
-          minimumBid = _parsePrice(productData?['startBid'] ?? 0);
-          currentBid = _parsePrice(productData?['currentBid'] ?? minimumBid);
-          buyNowPrice = _parsePrice(productData?['price'] ?? 0);
-          
-          final endTime = productData?['endTime'] as Timestamp?;
-          auctionEndTime = endTime?.toDate() ?? DateTime.now().add(const Duration(days: 3));
-          remainingTime = auctionEndTime.difference(DateTime.now());
-          
-          _startTimer();
+          productData = snapshot.data();
+          _updateProductData();
         });
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading product: $e')),
-      );
+    }, onError: (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading product: $error')),
+        );
+      }
+    });
+  }
+
+  void _updateProductData() {
+    if (productData == null) return;
+
+    minimumBid = _parsePrice(productData?['startBid'] ?? 0);
+    currentBid = _parsePrice(productData?['currentBid'] ?? minimumBid);
+    buyNowPrice = _parsePrice(productData?['price'] ?? 0);
+    
+    final endTime = productData?['endTime'] as Timestamp?;
+    auctionEndTime = endTime?.toDate() ?? DateTime.now().add(const Duration(days: 3));
+    remainingTime = auctionEndTime.difference(DateTime.now());
+    
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    isLeadingBidder = productData?['currentBidderId'] == userId;
+    
+    if (!isAuctionEnded && remainingTime.isNegative) {
+      isAuctionEnded = true;
+      _handleAuctionEnd();
+    }
+    
+    if (_timer == null || !_timer!.isActive) {
+      _startTimer();
     }
   }
 
@@ -74,6 +97,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   void _startTimer() {
+    _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
@@ -84,7 +108,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         if (remainingTime.isNegative) {
           remainingTime = const Duration();
           isAuctionEnded = true;
-          _timer?.cancel();
+          timer.cancel();
           _handleAuctionEnd();
         }
       });
@@ -105,7 +129,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       'productId': widget.productId,
       'name': productData?['name'],
       'price': currentBid,
-      'imageUrl': productData?['imageUrl'],
+      'imageUrl': productData?['imageUrl'] ?? productData?['image'],
       'isAuction': true,
       'quantity': 1,
       'status': 'Won',
@@ -113,12 +137,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     
     CartService.addToCart(auctionItem);
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${productData?['name']} added to your cart!'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${productData?['name']} added to your cart!'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   void _notifyAuctionEnded() {
@@ -143,6 +169,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   void dispose() {
     _timer?.cancel();
     _bidController.dispose();
+    _productSubscription?.cancel();
     super.dispose();
   }
 
@@ -162,16 +189,20 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         widget.onWatchlistChanged();
       }
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isInWatchlist ? 'Added to watchlist' : 'Removed from watchlist'),
-          duration: const Duration(seconds: 1),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isInWatchlist ? 'Added to watchlist' : 'Removed from watchlist'),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating watchlist: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating watchlist: $e')),
+        );
+      }
     }
   }
 
@@ -179,52 +210,46 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     if (productData == null) return;
     
     final bidAmount = double.tryParse(_bidController.text) ?? 0.0;
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
     
     if (bidAmount < minimumBid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Bid must be at least \$${minimumBid.toStringAsFixed(2)}'),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Bid must be at least \$${minimumBid.toStringAsFixed(2)}'),
+          ),
+        );
+      }
       return;
     }
 
     if (bidAmount <= currentBid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Your bid must be higher than \$${currentBid.toStringAsFixed(2)}'),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Your bid must be higher than \$${currentBid.toStringAsFixed(2)}'),
+          ),
+        );
+      }
       return;
     }
 
     try {
       await _firestore.collection('products').doc(widget.productId).update({
         'currentBid': bidAmount,
-        'lastBidder': FirebaseAuth.instance.currentUser?.uid,
+        'currentBidderId': userId,
+        'lastBidder': userId,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
       if (mounted) {
-        setState(() {
-          currentBid = bidAmount;
-          isLeadingBidder = true;
-          _bidController.clear();
-          
-          biddingHistory.add({
-            'productId': widget.productId,
-            'amount': bidAmount,
-            'date': DateFormat('MMM d, y').format(DateTime.now()),
-            'status': isAuctionEnded ? 'Won' : 'Winning',
-          });
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Bid of \$${bidAmount.toStringAsFixed(2)} placed successfully!'),
+          ),
+        );
       }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Bid of \$${bidAmount.toStringAsFixed(2)} placed successfully!'),
-        ),
-      );
       
       NotificationService.addNotification(
         title: 'Bid Placed',
@@ -232,9 +257,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         category: 'Auction',
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to place bid: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to place bid: $e')),
+        );
+      }
     }
   }
 
@@ -245,30 +272,32 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       'productId': widget.productId,
       'name': productData?['name'],
       'price': buyNowPrice,
-      'imageUrl': productData?['imageUrl'],
+      'imageUrl': productData?['imageUrl'] ?? productData?['image'],
       'isAuction': false,
       'quantity': 1,
     };
     
     CartService.addToCart(productItem);
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${productData?['name']} (\$${buyNowPrice.toStringAsFixed(2)}) added to cart!'),
-        duration: const Duration(seconds: 2),
-        action: SnackBarAction(
-          label: 'View Cart',
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CartScreen(),
-              ),
-            );
-          },
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${productData?['name']} (\$${buyNowPrice.toStringAsFixed(2)}) added to cart!'),
+          duration: const Duration(seconds: 2),
+          action: SnackBarAction(
+            label: 'View Cart',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CartScreen(),
+                ),
+              );
+            },
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
 
   String _formatDuration(Duration duration) {
@@ -290,9 +319,20 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
+    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
+    final cardColor = themeProvider.isDarkMode ? Colors.grey[800]! : Colors.white;
+    final dividerColor = themeProvider.isDarkMode ? Colors.grey[700]! : Colors.grey[300]!;
+
     if (productData == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: backgroundColor,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Theme.of(context).primaryColor,
+          ),
+        ),
       );
     }
 
@@ -300,19 +340,24 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(productData?['name'] ?? 'Product Details'),
+        title: Text(
+          productData?['name'] ?? 'Product Details',
+          style: TextStyle(color: textColor),
+        ),
+        backgroundColor: backgroundColor,
+        iconTheme: IconThemeData(color: textColor),
         actions: [
           IconButton(
             icon: Icon(
               isInWatchlist ? Icons.favorite : Icons.favorite_border,
-              color: isInWatchlist ? Colors.red : null,
+              color: isInWatchlist ? Colors.red : textColor,
             ),
             onPressed: _toggleWatchlist,
           ),
           Stack(
             children: [
               IconButton(
-                icon: const Icon(Icons.shopping_cart),
+                icon: Icon(Icons.shopping_cart, color: textColor),
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -350,6 +395,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           ),
         ],
       ),
+      backgroundColor: backgroundColor,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -359,23 +405,24 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               height: 300,
               color: Colors.grey.shade200,
               child: Center(
-                child: productData?['imageUrl'] != null
+                child: productData?['imageUrl'] != null || productData?['image'] != null
                     ? Image.network(
-                        productData?['imageUrl']!,
+                        productData?['imageUrl'] ?? productData?['image'],
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) => 
-                          const Icon(Icons.broken_image, size: 100),
+                          Icon(Icons.broken_image, size: 100, color: textColor),
                       )
-                    : const Icon(Icons.image, size: 100),
+                    : Icon(Icons.image, size: 100, color: textColor),
               ),
             ),
             const SizedBox(height: 16),
             
             Text(
               productData?['name'] ?? 'Unknown Product',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
+                color: textColor,
               ),
             ),
             const SizedBox(height: 16),
@@ -385,7 +432,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               children: [
                 Text(
                   'Minimum Bid: \$${priceFormat.format(minimumBid)}',
-                  style: const TextStyle(fontSize: 18),
+                  style: TextStyle(fontSize: 18, color: textColor),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -400,21 +447,22 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             ),
             const SizedBox(height: 16),
             
-            // Improved description display
             if (productData?['description'] != null && productData!['description'].toString().isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(
                   productData!['description'],
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     height: 1.5,
+                    color: textColor,
                   ),
                 ),
               ),
             const SizedBox(height: 16),
             
             Card(
+              color: cardColor,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -429,38 +477,43 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     const SizedBox(height: 8),
                     Text(
                       _formatDuration(remainingTime),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
+                        color: textColor,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Text('Days', style: TextStyle(fontSize: 12)),
-                        SizedBox(width: 24),
-                        Text('Hours', style: TextStyle(fontSize: 12)),
-                        SizedBox(width: 24),
-                        Text('Minutes', style: TextStyle(fontSize: 12)),
-                        SizedBox(width: 24),
-                        Text('Seconds', style: TextStyle(fontSize: 12)),
+                      children: [
+                        Text('Days', style: TextStyle(fontSize: 12, color: textColor)),
+                        const SizedBox(width: 24),
+                        Text('Hours', style: TextStyle(fontSize: 12, color: textColor)),
+                        const SizedBox(width: 24),
+                        Text('Minutes', style: TextStyle(fontSize: 12, color: textColor)),
+                        const SizedBox(width: 24),
+                        Text('Seconds', style: TextStyle(fontSize: 12, color: textColor)),
                       ],
                     ),
                     const SizedBox(height: 16),
                     Text(
                       'Current Bid: \$${priceFormat.format(currentBid)}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
+                        color: textColor,
                       ),
                     ),
                     if (isLeadingBidder)
-                      const Text(
-                        'You are the highest bidder!',
-                        style: TextStyle(
-                          color: Colors.green,
-                          fontWeight: FontWeight.bold,
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          'You are the highest bidder!',
+                          style: const TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                   ],
@@ -473,12 +526,21 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               TextField(
                 controller: _bidController,
                 keyboardType: TextInputType.number,
+                style: TextStyle(color: textColor),
                 decoration: InputDecoration(
                   labelText: 'Enter your bid (Min: \$${priceFormat.format(minimumBid)})',
+                  labelStyle: TextStyle(color: textColor.withOpacity(0.7)),
                   prefixText: '\$',
+                  prefixStyle: TextStyle(color: textColor),
                   suffixIcon: IconButton(
-                    icon: const Icon(Icons.clear),
+                    icon: Icon(Icons.clear, color: textColor),
                     onPressed: () => _bidController.clear(),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: dividerColor),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Theme.of(context).primaryColor),
                   ),
                 ),
               ),
@@ -486,14 +548,23 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           ],
         ),
       ),
-      bottomNavigationBar: Padding(
+      bottomNavigationBar: Container(
+        color: cardColor,
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
             Expanded(
               child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: Theme.of(context).primaryColor),
+                ),
                 onPressed: isAuctionEnded ? null : _placeBid,
-                child: const Text('Place Bid'),
+                child: Text(
+                  'Place Bid',
+                  style: TextStyle(
+                    color: isAuctionEnded ? textColor.withOpacity(0.5) : Theme.of(context).primaryColor,
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 16),
