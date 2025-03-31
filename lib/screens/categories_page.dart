@@ -20,7 +20,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
     'Auction',
     'Buy Now',
     'Open Editions',
-    'Sold'
+    'Sold',
   ];
 
   final List<String> _categories = [
@@ -29,7 +29,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
     'Dunny',
     'Funko',
     'Kaws',
-    'Supreme'
+    'Supreme',
   ];
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -38,10 +38,11 @@ class _CategoriesPageState extends State<CategoriesPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => FilteredProductsPage(
-          filterType: filterType,
-          category: category,
-        ),
+        builder:
+            (context) => FilteredProductsPage(
+              filterType: filterType,
+              category: category,
+            ),
       ),
     );
   }
@@ -91,15 +92,12 @@ class _CategoriesPageState extends State<CategoriesPage> {
   Widget _buildCategoryItem(String title, IconData icon) {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
-    
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: Colors.grey.shade300,
-          width: 1,
-        ),
+        side: BorderSide(color: Colors.grey.shade300, width: 1),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -137,12 +135,13 @@ class _CategoriesPageState extends State<CategoriesPage> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ProductDetailPage(
-              productId: productId,
-              onWatchlistChanged: () {
-                setState(() {});
-              },
-            ),
+            builder:
+                (context) => ProductDetailPage(
+                  productId: productId,
+                  onWatchlistChanged: () {
+                    setState(() {});
+                  },
+                ),
           ),
         );
       },
@@ -158,19 +157,21 @@ class _CategoriesPageState extends State<CategoriesPage> {
                 child: Container(
                   color: Colors.grey.shade200,
                   child: Center(
-                    child: product['image'] != null
-                        ? Image.network(
-                            product['image'],
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            errorBuilder: (context, error, stackTrace) => 
-                              const Icon(Icons.broken_image),
-                          )
-                        : Icon(
-                            Icons.image,
-                            size: 50,
-                            color: Colors.grey.shade400,
-                          ),
+                    child:
+                        product['image'] != null
+                            ? Image.network(
+                              'https://drive.google.com/uc?export=view&id=${product['image']}',
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              errorBuilder:
+                                  (context, error, stackTrace) =>
+                                      const Icon(Icons.broken_image),
+                            )
+                            : Icon(
+                              Icons.image,
+                              size: 50,
+                              color: Colors.grey.shade400,
+                            ),
                   ),
                 ),
               ),
@@ -178,10 +179,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
             const SizedBox(height: 8),
             Text(
               product['name']?.toString() ?? 'Unknown Product',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: textColor,
-              ),
+              style: TextStyle(fontWeight: FontWeight.w600, color: textColor),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -198,17 +196,17 @@ class _CategoriesPageState extends State<CategoriesPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: _getTypeColor(product['sellType'] ?? 'Buy Now'),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     product['sellType'] ?? 'Buy Now',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 10),
                   ),
                 ),
                 FutureBuilder<bool>(
@@ -224,9 +222,14 @@ class _CategoriesPageState extends State<CategoriesPage> {
                       onPressed: () async {
                         try {
                           if (isInWatchlist) {
-                            await WatchlistService.removeFromWatchlist(productId);
+                            await WatchlistService.removeFromWatchlist(
+                              productId,
+                            );
                           } else {
-                            await WatchlistService.addToWatchlist(productId, product);
+                            await WatchlistService.addToWatchlist(
+                              productId,
+                              product,
+                            );
                           }
                           setState(() {});
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -240,11 +243,9 @@ class _CategoriesPageState extends State<CategoriesPage> {
                             ),
                           );
                         } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Error: $e'),
-                            ),
-                          );
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text('Error: $e')));
                         }
                       },
                     );
@@ -258,14 +259,14 @@ class _CategoriesPageState extends State<CategoriesPage> {
     );
   }
 
-  BottomNavigationBar _buildBottomNavBar(BuildContext context, int currentIndex) {
+  BottomNavigationBar _buildBottomNavBar(
+    BuildContext context,
+    int currentIndex,
+  ) {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    final backgroundColor = themeProvider.isDarkMode 
-        ? Colors.grey[900]! 
-        : Colors.white;
-    final iconColor = themeProvider.isDarkMode 
-        ? Colors.white 
-        : Colors.black;
+    final backgroundColor =
+        themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
+    final iconColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
 
     return BottomNavigationBar(
       currentIndex: currentIndex,
@@ -279,7 +280,10 @@ class _CategoriesPageState extends State<CategoriesPage> {
         switch (index) {
           case 0:
             Navigator.pushNamedAndRemoveUntil(
-                context, '/home', (route) => false);
+              context,
+              '/home',
+              (route) => false,
+            );
             break;
           case 1:
             break;
@@ -320,9 +324,8 @@ class _CategoriesPageState extends State<CategoriesPage> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
-    final backgroundColor = themeProvider.isDarkMode 
-        ? Colors.grey[900]! 
-        : Colors.white;
+    final backgroundColor =
+        themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
 
     return Scaffold(
       appBar: AppBar(
@@ -351,8 +354,9 @@ class _CategoriesPageState extends State<CategoriesPage> {
                 children: List.generate(_filters.length, (index) {
                   return Padding(
                     padding: EdgeInsets.only(
-                        left: index == 0 ? 0 : 8, 
-                        right: index == _filters.length - 1 ? 0 : 8),
+                      left: index == 0 ? 0 : 8,
+                      right: index == _filters.length - 1 ? 0 : 8,
+                    ),
                     child: FilterChip(
                       label: Text(_filters[index]),
                       selected: _selectedFilterIndex == index,
@@ -365,9 +369,10 @@ class _CategoriesPageState extends State<CategoriesPage> {
                       selectedColor: Colors.blue.withOpacity(0.2),
                       checkmarkColor: Colors.blue,
                       labelStyle: TextStyle(
-                        color: _selectedFilterIndex == index 
-                            ? Colors.blue 
-                            : textColor,
+                        color:
+                            _selectedFilterIndex == index
+                                ? Colors.blue
+                                : textColor,
                       ),
                     ),
                   );
@@ -375,7 +380,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             Text(
               'Categories',
               style: TextStyle(
@@ -392,11 +397,15 @@ class _CategoriesPageState extends State<CategoriesPage> {
               childAspectRatio: 1.2,
               mainAxisSpacing: 16,
               crossAxisSpacing: 16,
-              children: _categories.map((category) {
-                return _buildCategoryItem(category, _getCategoryIcon(category));
-              }).toList(),
+              children:
+                  _categories.map((category) {
+                    return _buildCategoryItem(
+                      category,
+                      _getCategoryIcon(category),
+                    );
+                  }).toList(),
             ),
-            
+
             const SizedBox(height: 24),
             Text(
               'Popular in Categories',
@@ -410,10 +419,12 @@ class _CategoriesPageState extends State<CategoriesPage> {
             SizedBox(
               height: 220,
               child: StreamBuilder<QuerySnapshot>(
-                stream: _firestore.collection('products')
-                    .orderBy('updatedAt', descending: true)
-                    .limit(4)
-                    .snapshots(),
+                stream:
+                    _firestore
+                        .collection('products')
+                        .orderBy('updatedAt', descending: true)
+                        .limit(4)
+                        .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     return Center(child: Text('Error: ${snapshot.error}'));

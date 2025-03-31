@@ -51,20 +51,23 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         .collection('products')
         .doc(widget.productId)
         .snapshots()
-        .listen((snapshot) {
-      if (snapshot.exists && mounted) {
-        setState(() {
-          productData = snapshot.data();
-          _updateProductData();
-        });
-      }
-    }, onError: (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading product: $error')),
+        .listen(
+          (snapshot) {
+            if (snapshot.exists && mounted) {
+              setState(() {
+                productData = snapshot.data();
+                _updateProductData();
+              });
+            }
+          },
+          onError: (error) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error loading product: $error')),
+              );
+            }
+          },
         );
-      }
-    });
   }
 
   void _updateProductData() {
@@ -73,19 +76,20 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     minimumBid = _parsePrice(productData?['startBid'] ?? 0);
     currentBid = _parsePrice(productData?['currentBid'] ?? minimumBid);
     buyNowPrice = _parsePrice(productData?['price'] ?? 0);
-    
+
     final endTime = productData?['endTime'] as Timestamp?;
-    auctionEndTime = endTime?.toDate() ?? DateTime.now().add(const Duration(days: 3));
+    auctionEndTime =
+        endTime?.toDate() ?? DateTime.now().add(const Duration(days: 3));
     remainingTime = auctionEndTime.difference(DateTime.now());
-    
+
     final userId = FirebaseAuth.instance.currentUser?.uid;
     isLeadingBidder = productData?['currentBidderId'] == userId;
-    
+
     if (!isAuctionEnded && remainingTime.isNegative) {
       isAuctionEnded = true;
       _handleAuctionEnd();
     }
-    
+
     if (_timer == null || !_timer!.isActive) {
       _startTimer();
     }
@@ -124,7 +128,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   void _addWonAuctionToCart() {
     if (productData == null) return;
-    
+
     final auctionItem = {
       'productId': widget.productId,
       'name': productData?['name'],
@@ -134,9 +138,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       'quantity': 1,
       'status': 'Won',
     };
-    
+
     CartService.addToCart(auctionItem);
-    
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -149,11 +153,12 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   void _notifyAuctionEnded() {
     if (productData == null) return;
-    
+
     if (isLeadingBidder) {
       NotificationService.addNotification(
         title: 'Auction Won!',
-        message: 'You won the auction for ${productData?['name']} with your bid of \$${currentBid.toStringAsFixed(2)}',
+        message:
+            'You won the auction for ${productData?['name']} with your bid of \$${currentBid.toStringAsFixed(2)}',
         category: 'Auction',
       );
     } else {
@@ -188,36 +193,40 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         });
         widget.onWatchlistChanged();
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isInWatchlist ? 'Added to watchlist' : 'Removed from watchlist'),
+            content: Text(
+              isInWatchlist ? 'Added to watchlist' : 'Removed from watchlist',
+            ),
             duration: const Duration(seconds: 1),
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating watchlist: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error updating watchlist: $e')));
       }
     }
   }
 
   Future<void> _placeBid() async {
     if (productData == null) return;
-    
+
     final bidAmount = double.tryParse(_bidController.text) ?? 0.0;
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) return;
-    
+
     if (bidAmount < minimumBid) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Bid must be at least \$${minimumBid.toStringAsFixed(2)}'),
+            content: Text(
+              'Bid must be at least \$${minimumBid.toStringAsFixed(2)}',
+            ),
           ),
         );
       }
@@ -228,7 +237,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Your bid must be higher than \$${currentBid.toStringAsFixed(2)}'),
+            content: Text(
+              'Your bid must be higher than \$${currentBid.toStringAsFixed(2)}',
+            ),
           ),
         );
       }
@@ -246,28 +257,31 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Bid of \$${bidAmount.toStringAsFixed(2)} placed successfully!'),
+            content: Text(
+              'Bid of \$${bidAmount.toStringAsFixed(2)} placed successfully!',
+            ),
           ),
         );
       }
-      
+
       NotificationService.addNotification(
         title: 'Bid Placed',
-        message: 'You placed a bid of \$${bidAmount.toStringAsFixed(2)} on ${productData?['name']}',
+        message:
+            'You placed a bid of \$${bidAmount.toStringAsFixed(2)} on ${productData?['name']}',
         category: 'Auction',
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to place bid: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to place bid: $e')));
       }
     }
   }
 
   void _buyNow() {
     if (productData == null) return;
-    
+
     final productItem = {
       'productId': widget.productId,
       'name': productData?['name'],
@@ -276,22 +290,22 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       'isAuction': false,
       'quantity': 1,
     };
-    
+
     CartService.addToCart(productItem);
-    
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${productData?['name']} (\$${buyNowPrice.toStringAsFixed(2)}) added to cart!'),
+          content: Text(
+            '${productData?['name']} (\$${buyNowPrice.toStringAsFixed(2)}) added to cart!',
+          ),
           duration: const Duration(seconds: 2),
           action: SnackBarAction(
             label: 'View Cart',
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => CartScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => CartScreen()),
               );
             },
           ),
@@ -321,9 +335,12 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
-    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
-    final cardColor = themeProvider.isDarkMode ? Colors.grey[800]! : Colors.white;
-    final dividerColor = themeProvider.isDarkMode ? Colors.grey[700]! : Colors.grey[300]!;
+    final backgroundColor =
+        themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
+    final cardColor =
+        themeProvider.isDarkMode ? Colors.grey[800]! : Colors.white;
+    final dividerColor =
+        themeProvider.isDarkMode ? Colors.grey[700]! : Colors.grey[300]!;
 
     if (productData == null) {
       return Scaffold(
@@ -361,9 +378,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => CartScreen(),
-                    ),
+                    MaterialPageRoute(builder: (context) => CartScreen()),
                   );
                 },
               ),
@@ -383,10 +398,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     ),
                     child: Text(
                       CartService.cartItems.length.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                      ),
+                      style: const TextStyle(color: Colors.white, fontSize: 10),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -405,18 +417,24 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               height: 300,
               color: Colors.grey.shade200,
               child: Center(
-                child: productData?['imageUrl'] != null || productData?['image'] != null
-                    ? Image.network(
-                        productData?['imageUrl'] ?? productData?['image'],
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => 
-                          Icon(Icons.broken_image, size: 100, color: textColor),
-                      )
-                    : Icon(Icons.image, size: 100, color: textColor),
+                child:
+                    productData?['imageUrl'] != null ||
+                            productData?['image'] != null
+                        ? Image.network(
+                          'https://drive.google.com/uc?export=view&id=${productData?['image']}',
+                          fit: BoxFit.contain,
+                          errorBuilder:
+                              (context, error, stackTrace) => Icon(
+                                Icons.broken_image,
+                                size: 100,
+                                color: textColor,
+                              ),
+                        )
+                        : Icon(Icons.image, size: 100, color: textColor),
               ),
             ),
             const SizedBox(height: 16),
-            
+
             Text(
               productData?['name'] ?? 'Unknown Product',
               style: TextStyle(
@@ -426,7 +444,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -446,21 +464,18 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               ],
             ),
             const SizedBox(height: 16),
-            
-            if (productData?['description'] != null && productData!['description'].toString().isNotEmpty)
+
+            if (productData?['description'] != null &&
+                productData!['description'].toString().isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(
                   productData!['description'],
-                  style: TextStyle(
-                    fontSize: 16,
-                    height: 1.5,
-                    color: textColor,
-                  ),
+                  style: TextStyle(fontSize: 16, height: 1.5, color: textColor),
                 ),
               ),
             const SizedBox(height: 16),
-            
+
             Card(
               color: cardColor,
               child: Padding(
@@ -487,13 +502,25 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Days', style: TextStyle(fontSize: 12, color: textColor)),
+                        Text(
+                          'Days',
+                          style: TextStyle(fontSize: 12, color: textColor),
+                        ),
                         const SizedBox(width: 24),
-                        Text('Hours', style: TextStyle(fontSize: 12, color: textColor)),
+                        Text(
+                          'Hours',
+                          style: TextStyle(fontSize: 12, color: textColor),
+                        ),
                         const SizedBox(width: 24),
-                        Text('Minutes', style: TextStyle(fontSize: 12, color: textColor)),
+                        Text(
+                          'Minutes',
+                          style: TextStyle(fontSize: 12, color: textColor),
+                        ),
                         const SizedBox(width: 24),
-                        Text('Seconds', style: TextStyle(fontSize: 12, color: textColor)),
+                        Text(
+                          'Seconds',
+                          style: TextStyle(fontSize: 12, color: textColor),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -520,7 +547,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 ),
               ),
             ),
-            
+
             if (!isAuctionEnded) ...[
               const SizedBox(height: 16),
               TextField(
@@ -528,7 +555,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 keyboardType: TextInputType.number,
                 style: TextStyle(color: textColor),
                 decoration: InputDecoration(
-                  labelText: 'Enter your bid (Min: \$${priceFormat.format(minimumBid)})',
+                  labelText:
+                      'Enter your bid (Min: \$${priceFormat.format(minimumBid)})',
                   labelStyle: TextStyle(color: textColor.withOpacity(0.7)),
                   prefixText: '\$',
                   prefixStyle: TextStyle(color: textColor),
@@ -540,7 +568,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     borderSide: BorderSide(color: dividerColor),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Theme.of(context).primaryColor),
+                    borderSide: BorderSide(
+                      color: Theme.of(context).primaryColor,
+                    ),
                   ),
                 ),
               ),
@@ -562,13 +592,16 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 child: Text(
                   'Place Bid',
                   style: TextStyle(
-                    color: isAuctionEnded ? textColor.withOpacity(0.5) : Theme.of(context).primaryColor,
+                    color:
+                        isAuctionEnded
+                            ? textColor.withOpacity(0.5)
+                            : Theme.of(context).primaryColor,
                   ),
                 ),
               ),
             ),
             const SizedBox(width: 16),
-            
+
             Expanded(
               child: ElevatedButton(
                 onPressed: _buyNow,

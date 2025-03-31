@@ -64,49 +64,64 @@ class HomePage extends StatelessWidget {
   }
 
   Widget _buildPromoBanner(BuildContext context) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: _firestore.collection('promotions').snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(child: Text('Error loading promotions', style: TextStyle(color: Colors.red)));
-        }
+    // List of your promo images (can be from Firestore or hardcoded)
+    final List<String> promoImages = [
+      'https://drive.google.com/uc?export=view&id=1hl43ybxuK08k5r1-m1nBkYvh_sFzzFPH',
+      'https://drive.google.com/uc?export=view&id=1BONrAPapcur5HI-EYB7zQ_FavoxZ_Ra8',
+      'https://drive.google.com/uc?export=view&id=1RZ-gKJnxYAQb3qV3G8Rkp5kBfFltYdpp',
+    ];
 
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(
-            height: 200,
-            child: Center(child: CircularProgressIndicator()),
+    return SizedBox(
+      height: 200,
+      child: PageView.builder(
+        itemCount: promoImages.length,
+        itemBuilder: (context, index) {
+          return Container(
+            margin: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.grey[200],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                promoImages[index],
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      value:
+                          loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Colors.grey[300],
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error, color: Colors.red),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Promo ${index + 1} failed to load',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
           );
-        }
-
-        final promotions = snapshot.data?.docs ?? [];
-
-        if (promotions.isEmpty) {
-          return const SizedBox(
-            height: 200,
-            child: Center(child: Text('No promotions available')),
-          );
-        }
-
-        return SizedBox(
-          height: 200,
-          child: PageView.builder(
-            itemCount: promotions.length,
-            itemBuilder: (context, index) {
-              final promo = promotions[index].data() as Map<String, dynamic>;
-              return Container(
-                margin: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  image: DecorationImage(
-                    image: NetworkImage(promo['imageUrl'] ?? ''),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              );
-            },
-          ),
-        );
-      },
+        },
+      ),
     );
   }
 
@@ -134,9 +149,11 @@ class HomePage extends StatelessWidget {
     final cardColor = isDarkMode ? Colors.grey[800] : Colors.white;
 
     return StreamBuilder<QuerySnapshot>(
-      stream: _firestore.collection('products')
-          .where('sellType', isEqualTo: 'Auction')
-          .snapshots(),
+      stream:
+          _firestore
+              .collection('products')
+              .where('sellType', isEqualTo: 'Auction')
+              .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return SizedBox(
@@ -178,13 +195,14 @@ class HomePage extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             itemCount: recommendations.length,
             itemBuilder: (context, index) {
-              final product = recommendations[index].data() as Map<String, dynamic>;
+              final product =
+                  recommendations[index].data() as Map<String, dynamic>;
               return Container(
                 width: 160,
                 margin: const EdgeInsets.symmetric(horizontal: 8),
                 child: _buildProductCard(
-                  product, 
-                  context, 
+                  product,
+                  context,
                   cardColor,
                   recommendations[index].id,
                   textColor: textColor,
@@ -235,24 +253,25 @@ class HomePage extends StatelessWidget {
           crossAxisCount: 2,
           childAspectRatio: 0.8,
           padding: const EdgeInsets.all(8),
-          children: products.map((doc) {
-            final product = doc.data() as Map<String, dynamic>;
-            return _buildProductCard(
-              product, 
-              context, 
-              cardColor,
-              doc.id,
-              textColor: textColor,
-            );
-          }).toList(),
+          children:
+              products.map((doc) {
+                final product = doc.data() as Map<String, dynamic>;
+                return _buildProductCard(
+                  product,
+                  context,
+                  cardColor,
+                  doc.id,
+                  textColor: textColor,
+                );
+              }).toList(),
         );
       },
     );
   }
 
   Widget _buildProductCard(
-    Map<String, dynamic> product, 
-    BuildContext context, 
+    Map<String, dynamic> product,
+    BuildContext context,
     Color? cardColor,
     String productId, {
     required Color textColor,
@@ -262,19 +281,18 @@ class HomePage extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ProductDetailPage(
-              productId: productId,
-              onWatchlistChanged: () {},
-            ),
+            builder:
+                (context) => ProductDetailPage(
+                  productId: productId,
+                  onWatchlistChanged: () {},
+                ),
           ),
         );
       },
       child: Card(
         color: cardColor,
         margin: const EdgeInsets.all(8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -284,34 +302,35 @@ class HomePage extends StatelessWidget {
                   topLeft: Radius.circular(12),
                   topRight: Radius.circular(12),
                 ),
-                child: product['image'] != null
-                    ? Image.network(
-                        product['image']!,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey.shade200,
-                            child: Center(
-                              child: Icon(
-                                Icons.broken_image,
-                                size: 50,
-                                color: Colors.grey.shade400,
+                child:
+                    product['image'] != null
+                        ? Image.network(
+                          'https://drive.google.com/uc?export=view&id=${product['image']}',
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.grey.shade200,
+                              child: Center(
+                                child: Icon(
+                                  Icons.broken_image,
+                                  size: 50,
+                                  color: Colors.grey.shade400,
+                                ),
                               ),
+                            );
+                          },
+                        )
+                        : Container(
+                          color: Colors.grey.shade200,
+                          child: Center(
+                            child: Icon(
+                              Icons.image,
+                              size: 50,
+                              color: Colors.grey.shade400,
                             ),
-                          );
-                        },
-                      )
-                    : Container(
-                        color: Colors.grey.shade200,
-                        child: Center(
-                          child: Icon(
-                            Icons.image,
-                            size: 50,
-                            color: Colors.grey.shade400,
                           ),
                         ),
-                      ),
               ),
             ),
             Padding(
@@ -344,10 +363,7 @@ class HomePage extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       'Auction',
-                      style: TextStyle(
-                        color: Colors.orange,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: Colors.orange, fontSize: 12),
                     ),
                   ],
                 ],
@@ -359,7 +375,11 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  BottomNavigationBar _buildBottomNavBar(BuildContext context, int currentIndex, bool isDarkMode) {
+  BottomNavigationBar _buildBottomNavBar(
+    BuildContext context,
+    int currentIndex,
+    bool isDarkMode,
+  ) {
     return BottomNavigationBar(
       currentIndex: currentIndex,
       type: BottomNavigationBarType.fixed,
@@ -372,7 +392,10 @@ class HomePage extends StatelessWidget {
         switch (index) {
           case 0:
             Navigator.pushNamedAndRemoveUntil(
-              context, '/home', (route) => false);
+              context,
+              '/home',
+              (route) => false,
+            );
             break;
           case 1:
             Navigator.pushNamed(context, '/categories');

@@ -10,11 +10,7 @@ class FilteredProductsPage extends StatelessWidget {
   final String? category;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  FilteredProductsPage({
-    super.key,
-    required this.filterType,
-    this.category,
-  });
+  FilteredProductsPage({super.key, required this.filterType, this.category});
 
   Stream<QuerySnapshot> _getFilteredProductsStream() {
     Query query = _firestore.collection('products');
@@ -26,20 +22,17 @@ class FilteredProductsPage extends StatelessWidget {
           .orderBy('type')
           .orderBy('sellType')
           .orderBy('updatedAt', descending: true);
-    }
-    else if (category != null) {
+    } else if (category != null) {
       query = query
           .where('type', isEqualTo: category)
           .orderBy('type')
           .orderBy('updatedAt', descending: true);
-    }
-    else if (filterType != 'All') {
+    } else if (filterType != 'All') {
       query = query
           .where('sellType', isEqualTo: filterType)
           .orderBy('sellType')
           .orderBy('updatedAt', descending: true);
-    }
-    else {
+    } else {
       query = query.orderBy('updatedAt', descending: true);
     }
 
@@ -50,9 +43,12 @@ class FilteredProductsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
-    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
-    final cardColor = themeProvider.isDarkMode ? Colors.grey[800]! : Colors.white;
-    final secondaryTextColor = themeProvider.isDarkMode ? Colors.grey[300]! : Colors.grey[600]!;
+    final backgroundColor =
+        themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
+    final cardColor =
+        themeProvider.isDarkMode ? Colors.grey[800]! : Colors.white;
+    final secondaryTextColor =
+        themeProvider.isDarkMode ? Colors.grey[300]! : Colors.grey[600]!;
 
     return Scaffold(
       appBar: AppBar(
@@ -108,7 +104,7 @@ class FilteredProductsPage extends StatelessWidget {
               final product = productDoc.data() as Map<String, dynamic>;
               return _buildProductItem(
                 productDoc.id,
-                product, 
+                product,
                 context,
                 textColor: textColor,
                 cardColor: cardColor,
@@ -123,14 +119,14 @@ class FilteredProductsPage extends StatelessWidget {
 
   Widget _buildProductItem(
     String productId,
-    Map<String, dynamic> product, 
+    Map<String, dynamic> product,
     BuildContext context, {
     required Color textColor,
     required Color cardColor,
     required Color secondaryTextColor,
   }) {
     final price = _parsePrice(product['price'] ?? product['startBid']);
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       color: cardColor,
@@ -139,10 +135,11 @@ class FilteredProductsPage extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ProductDetailPage(
-                productId: productId,
-                onWatchlistChanged: () {},
-              ),
+              builder:
+                  (context) => ProductDetailPage(
+                    productId: productId,
+                    onWatchlistChanged: () {},
+                  ),
             ),
           );
         },
@@ -156,17 +153,16 @@ class FilteredProductsPage extends StatelessWidget {
                   width: 80,
                   height: 80,
                   color: Colors.grey.shade200,
-                  child: product['image'] != null
-                      ? Image.network(
-                          product['image'],
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => 
-                            Icon(Icons.broken_image, color: textColor),
-                        )
-                      : Icon(
-                          Icons.image,
-                          color: Colors.grey.shade400,
-                        ),
+                  child:
+                      product['image'] != null
+                          ? Image.network(
+                            'https://drive.google.com/uc?export=view&id=${product['image']}',
+                            fit: BoxFit.cover,
+                            errorBuilder:
+                                (context, error, stackTrace) =>
+                                    Icon(Icons.broken_image, color: textColor),
+                          )
+                          : Icon(Icons.image, color: Colors.grey.shade400),
                 ),
               ),
               const SizedBox(width: 12),
@@ -191,11 +187,9 @@ class FilteredProductsPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      product['description']?.toString() ?? 'No description available',
-                      style: TextStyle(
-                        color: secondaryTextColor,
-                        fontSize: 12,
-                      ),
+                      product['description']?.toString() ??
+                          'No description available',
+                      style: TextStyle(color: secondaryTextColor, fontSize: 12),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -216,7 +210,10 @@ class FilteredProductsPage extends StatelessWidget {
                         if (isInWatchlist) {
                           await WatchlistService.removeFromWatchlist(productId);
                         } else {
-                          await WatchlistService.addToWatchlist(productId, product);
+                          await WatchlistService.addToWatchlist(
+                            productId,
+                            product,
+                          );
                         }
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -231,11 +228,9 @@ class FilteredProductsPage extends StatelessWidget {
                           ),
                         );
                       } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Error: $e'),
-                          ),
-                        );
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text('Error: $e')));
                       }
                     },
                   );

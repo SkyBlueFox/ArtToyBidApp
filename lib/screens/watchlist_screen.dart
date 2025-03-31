@@ -5,7 +5,6 @@ import '../providers/theme_provider.dart';
 import 'product_detail_screen.dart';
 import 'watchlist_service.dart';
 
-
 class WatchlistPage extends StatefulWidget {
   const WatchlistPage({super.key});
 
@@ -18,9 +17,12 @@ class _WatchlistPageState extends State<WatchlistPage> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final textColor = themeProvider.isDarkMode ? Colors.white : Colors.black;
-    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
-    final cardColor = themeProvider.isDarkMode ? Colors.grey[800]! : Colors.white;
-    final dividerColor = themeProvider.isDarkMode ? Colors.grey[700]! : Colors.grey[300]!;
+    final backgroundColor =
+        themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
+    final cardColor =
+        themeProvider.isDarkMode ? Colors.grey[800]! : Colors.white;
+    final dividerColor =
+        themeProvider.isDarkMode ? Colors.grey[700]! : Colors.grey[300]!;
 
     return Scaffold(
       appBar: AppBar(
@@ -97,8 +99,8 @@ class _WatchlistPageState extends State<WatchlistPage> {
               final item = watchlistItems[index];
               final product = item.data() as Map<String, dynamic>;
               return _buildWatchlistItem(
-                item.id, 
-                product, 
+                item.id,
+                product,
                 context,
                 textColor: textColor,
                 cardColor: cardColor,
@@ -113,7 +115,7 @@ class _WatchlistPageState extends State<WatchlistPage> {
 
   Widget _buildWatchlistItem(
     String productId,
-    Map<String, dynamic> product, 
+    Map<String, dynamic> product,
     BuildContext context, {
     required Color textColor,
     required Color cardColor,
@@ -123,21 +125,20 @@ class _WatchlistPageState extends State<WatchlistPage> {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       color: cardColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ProductDetailPage(
-                productId: productId,
-                onWatchlistChanged: () {
-                  setState(() {});
-                },
-              ),
+              builder:
+                  (context) => ProductDetailPage(
+                    productId: productId,
+                    onWatchlistChanged: () {
+                      setState(() {});
+                    },
+                  ),
             ),
           );
         },
@@ -153,27 +154,28 @@ class _WatchlistPageState extends State<WatchlistPage> {
                 ),
                 color: Colors.grey.shade200,
               ),
-              child: product['imageUrl'] != null
-                  ? Image.network(
-                      product['imageUrl'],
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => 
-                        Center(
-                          child: Icon(
-                            Icons.broken_image, 
-                            size: 50,
-                            color: textColor.withOpacity(0.5),
-                          ),
+              child:
+                  product['image'] != null
+                      ? Center(
+                        child: Image.network(
+                          'https://drive.google.com/uc?export=view&id=${product['image']}',
+                          fit: BoxFit.cover,
+                          errorBuilder:
+                              (context, error, stackTrace) => Center(
+                                child: Icon(
+                                  Icons.broken_image,
+                                  size: 50,
+                                  color: textColor.withOpacity(0.5),
+                                ),
+                              ),
                         ),
-                    )
-                  : Center(
-                      child: Text(
-                        'Product Image',
-                        style: TextStyle(
-                          color: textColor.withOpacity(0.5),
+                      )
+                      : Center(
+                        child: Text(
+                          'Product Image',
+                          style: TextStyle(color: textColor.withOpacity(0.5)),
                         ),
                       ),
-                    ),
             ),
             Padding(
               padding: const EdgeInsets.all(16),
@@ -214,20 +216,17 @@ class _WatchlistPageState extends State<WatchlistPage> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       IconButton(
-                        icon: const Icon(
-                          Icons.favorite,
-                          color: Colors.red,
-                        ),
+                        icon: const Icon(Icons.favorite, color: Colors.red),
                         onPressed: () async {
                           try {
-                            await WatchlistService.removeFromWatchlist(productId);
+                            await WatchlistService.removeFromWatchlist(
+                              productId,
+                            );
                             if (mounted) setState(() {});
                           } catch (e) {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Failed to remove: $e'),
-                                ),
+                                SnackBar(content: Text('Failed to remove: $e')),
                               );
                             }
                           }
@@ -253,13 +252,15 @@ class _WatchlistPageState extends State<WatchlistPage> {
   }
 
   BottomNavigationBar _buildBottomNavBar(
-    BuildContext context, 
+    BuildContext context,
     int currentIndex,
     ThemeProvider themeProvider,
   ) {
-    final backgroundColor = themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
+    final backgroundColor =
+        themeProvider.isDarkMode ? Colors.grey[900]! : Colors.white;
     final selectedColor = Colors.blue;
-    final unselectedColor = themeProvider.isDarkMode ? Colors.grey[500]! : Colors.grey;
+    final unselectedColor =
+        themeProvider.isDarkMode ? Colors.grey[500]! : Colors.grey;
 
     return BottomNavigationBar(
       currentIndex: currentIndex,
@@ -273,7 +274,10 @@ class _WatchlistPageState extends State<WatchlistPage> {
         switch (index) {
           case 0:
             Navigator.pushNamedAndRemoveUntil(
-                context, '/home', (route) => false);
+              context,
+              '/home',
+              (route) => false,
+            );
             break;
           case 1:
             Navigator.pushNamed(context, '/categories');
